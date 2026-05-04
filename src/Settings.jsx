@@ -202,11 +202,11 @@ export default function Settings() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#10b981' }}>匯入「收入」CSV</h4>
-            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'income')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #10b981', borderRadius: '8px', cursor: 'pointer', color: '#666', background: '#ecfdf5', boxSizing: 'border-box' }} />
+            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'income')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #10b981', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#EAE3D2', boxSizing: 'border-box' }} />
           </div>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ef4444' }}>匯入「支出」CSV</h4>
-            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '8px', cursor: 'pointer', color: '#666', background: '#fef2f2', boxSizing: 'border-box' }} />
+            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F8F6F0', boxSizing: 'border-box' }} />
           </div>
         </div>
       </div>
@@ -242,12 +242,12 @@ function ManageList({ items = [], onUpdate, label, color }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
       {items.map((item, index) => (
-        <div key={`${item}-${index}`} style={{ display: 'flex', alignItems: 'center', background: '#f0f2f5', borderRadius: '20px', overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-          <span onClick={() => handleEdit(index)} style={{ padding: '8px 10px 8px 14px', fontSize: '14px', color: '#333', cursor: 'pointer' }} title="點擊編輯">{item}</span>
+        <div key={`${item}-${index}`} style={{ display: 'flex', alignItems: 'center', background: '#F8F6F0', borderRadius: '24px', overflow: 'hidden', border: '1px solid #EAE3D2' }}>
+          <span onClick={() => handleEdit(index)} style={{ padding: '8px 10px 8px 14px', fontSize: '14px', color: '#5C5446', cursor: 'pointer' }} title="點擊編輯">{item}</span>
           <button onClick={() => handleDelete(index)} style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', fontSize: '14px' }} title="刪除">✕</button>
         </div>
       ))}
-      <button onClick={handleAdd} style={{ padding: '8px 14px', background: '#fff', border: `1px dashed ${color}`, color: color, borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}>+ 新增{label}</button>
+      <button onClick={handleAdd} style={{ padding: '8px 14px', background: '#fff', border: `1px dashed ${color}`, color: color, borderRadius: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+ 新增{label}</button>
     </div>
   );
 }

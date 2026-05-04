@@ -96,13 +96,13 @@ export default function TransactionModal({ onClose, editData }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(configData.expenseCats[0] || ''); setAmount('0'); setItem(''); }}>支出</button>
-          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(configData.incomeCats[0] || ''); setAmount('0'); setItem(''); }}>收入</button>
+          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} style={{ borderTopLeftRadius: '24px' }} onClick={() => { setType('expense'); setCategory(configData.expenseCats[0] || ''); setAmount('0'); setItem(''); }}>支出</button>
+          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} style={{ borderTopRightRadius: '24px' }} onClick={() => { setType('income'); setCategory(configData.incomeCats[0] || ''); setAmount('0'); setItem(''); }}>收入</button>
         </div>
         
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff' }}>
           {/* 金額顯示 */}
-          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #10b981', paddingBottom: '5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #D5B77A', paddingBottom: '5px' }}>
             <span style={{ fontSize: '24px', fontWeight: 'bold', color: type === 'expense' ? '#ef4444' : '#10b981', marginRight: '10px' }}>$</span>
             <div style={{ fontSize: '32px', fontWeight: 'bold', width: '100%', textAlign: 'right', outline: 'none', color: type === 'expense' ? '#ef4444' : '#10b981', background: 'transparent', overflow: 'hidden' }}>
               {amount}
@@ -116,14 +116,14 @@ export default function TransactionModal({ onClose, editData }) {
               placeholder="請輸入項目名稱 (例如: 午餐)" 
               value={item}
               onChange={(e) => setItem(e.target.value)}
-              style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '10px', boxSizing: 'border-box', color: '#333', background: '#fff' }}
+              style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', marginBottom: '10px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }}
             />
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
               {shortcuts.map(s => (
                 <button 
                   key={s} 
                   onClick={() => setItem(s)}
-                  style={{ whiteSpace: 'nowrap', padding: '6px 12px', background: item === s ? '#10b981' : '#f0f2f5', color: item === s ? '#fff' : '#333', border: 'none', borderRadius: '20px', fontSize: '14px', cursor: 'pointer' }}
+                  style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: item === s ? '#D5B77A' : '#EAE3D2', color: item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}
                 >
                   {s}
                 </button>
@@ -139,7 +139,7 @@ export default function TransactionModal({ onClose, editData }) {
                 <button 
                   key={p} 
                   onClick={() => setPayer(p)}
-                  style={{ whiteSpace: 'nowrap', padding: '6px 12px', background: payer === p ? '#10b981' : '#f0f2f5', color: payer === p ? '#fff' : '#333', border: 'none', borderRadius: '20px', fontSize: '14px', cursor: 'pointer' }}
+                  style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: payer === p ? '#D5B77A' : '#EAE3D2', color: payer === p ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}
                 >
                   {p}
                 </button>

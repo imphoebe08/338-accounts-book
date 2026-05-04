@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth'
 import './layout.css'
 import Overview from './Overview'
 import Analysis from './Analysis'
@@ -12,6 +13,12 @@ function Layout({ children }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const location = useLocation();
+
+  const handleLogout = () => {
+    const auth = getAuth();
+    signOut(auth);
+    closeMenu();
+  };
 
   const navItems = [
     { path: '/', label: '收支總覽', icon: '📝' },
@@ -36,17 +43,20 @@ function Layout({ children }) {
       {/* 側邊收折選單 */}
       <nav className={`side-menu ${isMenuOpen ? 'open' : ''}`}>
         <div className="side-menu-header">Menu</div>
-        {navItems.map((item) => (
-          <Link 
-            key={item.path} 
-            to={item.path}
-            className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-            onClick={closeMenu}
-          >
-            <span className="nav-icon" style={{ fontSize: '20px' }}>{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
-          </Link>
-        ))}
+        <div style={{ flex: 1, paddingTop: '10px' }}>
+          {navItems.map((item) => (
+            <Link 
+              key={item.path} 
+              to={item.path}
+              className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={closeMenu}
+            >
+              <span className="nav-icon" style={{ fontSize: '20px' }}>{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
+            </Link>
+          ))}
+        </div>
+        <button onClick={handleLogout} style={{ margin: '20px', padding: '14px', background: '#F9F5F5', color: '#ef4444', border: 'none', borderRadius: '24px', fontWeight: 'bold', cursor: 'pointer', fontSize: '16px' }}>登出</button>
       </nav>
 
       {/* 主要內容區 */}
@@ -67,6 +77,38 @@ function Layout({ children }) {
 }
 
 function App() {
+  const [user, setUser] = useState(undefined);
+
+  useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
+
+  const handleLogin = () => {
+    const auth = getAuth();
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider).catch(err => alert('登入失敗: ' + err.message));
+  };
+
+  if (user === undefined) {
+    return <div style={{ display: 'flex', height: '100vh', justifyContent: 'center', alignItems: 'center', color: '#D5B77A', fontSize: '18px', fontWeight: 'bold' }}>載入中...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center', alignItems: 'center', background: '#F8F6F0' }}>
+        <div className="card" style={{ padding: '50px 40px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px', width: '80%', maxWidth: '350px' }}>
+          <h1 style={{ margin: 0, color: '#C2A363', fontSize: '28px' }}>簡單記帳</h1>
+          <p style={{ margin: 0, color: '#999', fontSize: '15px' }}>與伴侶一起共享莫蘭迪記帳生活</p>
+          <button onClick={handleLogin} style={{ padding: '16px 28px', marginTop: '20px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '28px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 16px rgba(213, 183, 122, 0.4)' }}>
+            使用 Google 登入
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Layout>

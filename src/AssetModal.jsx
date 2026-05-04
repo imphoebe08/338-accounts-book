@@ -98,65 +98,65 @@ export default function AssetModal({ onClose, editData }) {
         </div>
         
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff' }}>
-          <input type="text" name="item" placeholder="項目名稱 (例如: 台積電、薪轉戶)" value={formData.item} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+          <input type="text" name="item" placeholder="項目名稱 (例如: 台積電、薪轉戶)" value={formData.item} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
           {assetType === 'stock' && availableStocks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableStocks.map(s => (
-                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '6px 12px', background: formData.item === s ? '#10b981' : '#f0f2f5', color: formData.item === s ? '#fff' : '#333', border: 'none', borderRadius: '20px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
               ))}
             </div>
           )}
 
-          <input type="text" name="bank" placeholder="銀行 / 券商" value={formData.bank} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+          <input type="text" name="bank" placeholder="銀行 / 券商" value={formData.bank} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
           {availableBanks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableBanks.map(b => (
-                <button key={b} onClick={() => setFormData(prev => ({...prev, bank: b}))} style={{ whiteSpace: 'nowrap', padding: '6px 12px', background: formData.bank === b ? '#10b981' : '#f0f2f5', color: formData.bank === b ? '#fff' : '#333', border: 'none', borderRadius: '20px', fontSize: '14px', cursor: 'pointer' }}>{b}</button>
+                <button key={b} onClick={() => setFormData(prev => ({...prev, bank: b}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.bank === b ? '#D5B77A' : '#EAE3D2', color: formData.bank === b ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{b}</button>
               ))}
             </div>
           )}
           
-          <input type="text" name="holder" placeholder="持有人 / 存款人" value={formData.holder} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+          <input type="text" name="holder" placeholder="持有人 / 存款人" value={formData.holder} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
           {availablePayers.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availablePayers.map(p => (
-                <button key={p} onClick={() => setFormData(prev => ({...prev, holder: p}))} style={{ whiteSpace: 'nowrap', padding: '6px 12px', background: formData.holder === p ? '#10b981' : '#f0f2f5', color: formData.holder === p ? '#fff' : '#333', border: 'none', borderRadius: '20px', fontSize: '14px', cursor: 'pointer' }}>{p}</button>
+                <button key={p} onClick={() => setFormData(prev => ({...prev, holder: p}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.holder === p ? '#D5B77A' : '#EAE3D2', color: formData.holder === p ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{p}</button>
               ))}
             </div>
           )}
           
           {assetType === 'stock' ? (
             <>
-              <input type="number" name="shares" placeholder="持有股數" value={formData.shares} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
-              <input type="number" name="cost" placeholder="持有均價" value={formData.cost} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+              <input type="number" name="shares" placeholder="持有股數" value={formData.shares} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+              <input type="number" name="cost" placeholder="持有均價" value={formData.cost} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
             </>
           ) : (
             <>
               {assetType === 'fixed' && (
                 <>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
-                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '整存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '整存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '整存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>整存整付</button>
-                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '零存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '零存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '零存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>零存整付</button>
+                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '整存整付'}))} style={{ flex: 1, padding: '12px', background: formData.fixedType === '整存整付' ? '#D5B77A' : '#EAE3D2', color: formData.fixedType === '整存整付' ? '#fff' : '#5C5446', border: 'none', borderRadius: '16px', fontSize: '15px', cursor: 'pointer' }}>整存整付</button>
+                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '零存整付'}))} style={{ flex: 1, padding: '12px', background: formData.fixedType === '零存整付' ? '#D5B77A' : '#EAE3D2', color: formData.fixedType === '零存整付' ? '#fff' : '#5C5446', border: 'none', borderRadius: '16px', fontSize: '15px', cursor: 'pointer' }}>零存整付</button>
                 </div>
-                <input type="number" name="amount" placeholder={formData.fixedType === '零存整付' ? '每月存款金額' : '單筆存款金額'} value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
-                <input type="number" name="interestRate" placeholder="年利率 (%) (例如: 1.5)" value={formData.interestRate} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                <input type="number" name="amount" placeholder={formData.fixedType === '零存整付' ? '每月存款金額' : '單筆存款金額'} value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+                <input type="number" name="interestRate" placeholder="年利率 (%) (例如: 1.5)" value={formData.interestRate} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="date" name="startDate" placeholder="開始日期" value={formData.startDate} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
-                  <input type="date" name="endDate" placeholder="到期日 (點擊選擇)" value={formData.endDate} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                  <input type="date" name="startDate" placeholder="開始日期" value={formData.startDate} onChange={handleChange} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+                  <input type="date" name="endDate" placeholder="到期日 (點擊選擇)" value={formData.endDate} onChange={handleChange} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="number" name="durationMonths" placeholder="為期 (個月)" value={formData.durationMonths} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
-                  <input type="number" name="renewalCount" placeholder="續存次數" value={formData.renewalCount} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                  <input type="number" name="durationMonths" placeholder="為期 (個月)" value={formData.durationMonths} onChange={handleChange} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+                  <input type="number" name="renewalCount" placeholder="續存次數" value={formData.renewalCount} onChange={handleChange} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
                 </div>
                 </>
               )}
               {assetType === 'demand' && (
-                <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
               )}
             </>
           )}
           
-          <button onClick={handleSubmit} style={{ width: '100%', padding: '14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>完成</button>
+          <button onClick={handleSubmit} style={{ width: '100%', padding: '14px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '24px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px', boxShadow: '0 4px 12px rgba(213, 183, 122, 0.3)' }}>完成</button>
         </div>
       </div>
     </div>

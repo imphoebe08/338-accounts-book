@@ -264,7 +264,7 @@ export default function Analysis() {
     }).sort((a, b) => b.pAmt - a.pAmt);
   }
 
-  const selectStyle = { padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', color: '#333', fontSize: '14px', background: '#fff' };
+  const selectStyle = { padding: '8px 12px', borderRadius: '16px', border: '1px solid #EAE3D2', color: '#5C5446', fontSize: '14px', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' };
 
   // 為圖表產生相對應名稱
   const primaryTitle = generateTitle(filterYear, filterMonth, filterTxType, filterCategory, filterPayer);
@@ -313,7 +313,7 @@ export default function Analysis() {
               {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
             
-            <button onClick={handleResetFilters} style={{ padding: '6px 12px', background: '#f3f4f6', color: '#4b5563', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>清空</button>
+            <button onClick={handleResetFilters} style={{ padding: '8px 16px', background: '#F8F6F0', color: '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '14px' }}>清空</button>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', marginLeft: 'auto', fontWeight: 'bold', color: isComparing ? '#8b5cf6' : '#666' }}>
               <input type="checkbox" checked={isComparing} onChange={e => setIsComparing(e.target.checked)} />
@@ -365,9 +365,9 @@ export default function Analysis() {
               )}
             </h3>
             <div style={{ display: 'flex', gap: '5px' }}>
-              <button onClick={() => setChartType('bar')} style={{ padding: '4px 8px', background: chartType === 'bar' ? '#10b981' : '#f0f2f5', color: chartType === 'bar' ? '#fff' : '#666', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>柱狀圖</button>
-              <button onClick={() => setChartType('line')} style={{ padding: '4px 8px', background: chartType === 'line' ? '#10b981' : '#f0f2f5', color: chartType === 'line' ? '#fff' : '#666', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>折線圖</button>
-              <button onClick={() => setChartType('pie')} style={{ padding: '4px 8px', background: chartType === 'pie' ? '#10b981' : '#f0f2f5', color: chartType === 'pie' ? '#fff' : '#666', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>圓餅圖</button>
+              <button onClick={() => setChartType('bar')} style={{ padding: '6px 14px', background: chartType === 'bar' ? '#D5B77A' : '#EAE3D2', color: chartType === 'bar' ? '#fff' : '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '12px' }}>柱狀圖</button>
+              <button onClick={() => setChartType('line')} style={{ padding: '6px 14px', background: chartType === 'line' ? '#D5B77A' : '#EAE3D2', color: chartType === 'line' ? '#fff' : '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '12px' }}>折線圖</button>
+              <button onClick={() => setChartType('pie')} style={{ padding: '6px 14px', background: chartType === 'pie' ? '#D5B77A' : '#EAE3D2', color: chartType === 'pie' ? '#fff' : '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '12px' }}>圓餅圖</button>
             </div>
           </div>
           <div style={{ width: '100%', minHeight: chartType === 'pie' ? '550px' : '450px' }}>
@@ -379,10 +379,10 @@ export default function Analysis() {
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip cursor={{fill: '#f4f4f4'}} formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
                 <Legend />
-                {(!filterTxType || filterTxType === 'income') && <Bar dataKey="主條件_收入" name={pIncName} fill="#10b981" radius={[4, 4, 0, 0]} />}
-                {(!filterTxType || filterTxType === 'expense') && <Bar dataKey="主條件_支出" name={pExpName} fill="#ef4444" radius={[4, 4, 0, 0]} />}
-                {isComparing && (!compTxType || compTxType === 'income') && <Bar dataKey="比較條件_收入" name={cIncName} fill="#3b82f6" radius={[4, 4, 0, 0]} />}
-                {isComparing && (!compTxType || compTxType === 'expense') && <Bar dataKey="比較條件_支出" name={cExpName} fill="#f59e0b" radius={[4, 4, 0, 0]} />}
+                {(!filterTxType || filterTxType === 'income') && <Bar dataKey="主條件_收入" name={pIncName} fill="#10b981" radius={[8, 8, 0, 0]} />}
+                {(!filterTxType || filterTxType === 'expense') && <Bar dataKey="主條件_支出" name={pExpName} fill="#ef4444" radius={[8, 8, 0, 0]} />}
+                {isComparing && (!compTxType || compTxType === 'income') && <Bar dataKey="比較條件_收入" name={cIncName} fill="#3b82f6" radius={[8, 8, 0, 0]} />}
+                {isComparing && (!compTxType || compTxType === 'expense') && <Bar dataKey="比較條件_支出" name={cExpName} fill="#f59e0b" radius={[8, 8, 0, 0]} />}
               </BarChart>
             ) : chartType === 'line' ? (
               <LineChart data={timelineData}>
@@ -391,10 +391,10 @@ export default function Analysis() {
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
                 <Legend />
-                {(!filterTxType || filterTxType === 'income') && <Line type="monotone" dataKey="主條件_收入" name={pIncName} stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />}
-                {(!filterTxType || filterTxType === 'expense') && <Line type="monotone" dataKey="主條件_支出" name={pExpName} stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />}
-                {isComparing && (!compTxType || compTxType === 'income') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_收入" name={cIncName} stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />}
-                {isComparing && (!compTxType || compTxType === 'expense') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_支出" name={cExpName} stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />}
+                {(!filterTxType || filterTxType === 'income') && <Line type="monotone" dataKey="主條件_收入" name={pIncName} stroke="#10b981" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                {(!filterTxType || filterTxType === 'expense') && <Line type="monotone" dataKey="主條件_支出" name={pExpName} stroke="#ef4444" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                {isComparing && (!compTxType || compTxType === 'income') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_收入" name={cIncName} stroke="#3b82f6" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                {isComparing && (!compTxType || compTxType === 'expense') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_支出" name={cExpName} stroke="#f59e0b" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
               </LineChart>
             ) : (
               <PieChart>
@@ -481,7 +481,7 @@ export default function Analysis() {
                 tableData.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '10px 5px', color: '#333' }}>{row.name}</td>
-                    <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#ef4444' : '#333', fontWeight: 'bold' }}>${row.pAmt.toLocaleString()}</td>
+                    <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>${row.pAmt.toLocaleString()}</td>
                     <td style={{ padding: '10px 5px', color: '#666' }}>{row.pRat}</td>
                     {isComparing && (
                       <>

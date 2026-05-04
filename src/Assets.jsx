@@ -82,7 +82,7 @@ export default function Assets() {
         <h2>財產清單</h2>
       </div>
 
-      <Section title="📈 股票清單" action={<button onClick={handleFetchPrices} disabled={isFetching} style={{ padding: '6px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>{isFetching ? '抓取中...' : '更新今日收盤價'}</button>}>
+      <Section title="📈 股票清單" action={<button onClick={handleFetchPrices} disabled={isFetching} style={{ padding: '8px 16px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(213, 183, 122, 0.3)' }}>{isFetching ? '抓取中...' : '更新今日收盤價'}</button>}>
         <div className="card-grid">
           {stocks.map(stock => (
             <div className="card" key={stock.id}>
@@ -97,8 +97,8 @@ export default function Assets() {
                 <Row label="目前市值" value={`$${(stock.shares * stock.refPrice).toLocaleString()}`} color="#ef4444" isBold />
               </div>
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(stock)}>編輯</button>
-                <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteStock(stock.id)}>刪除</button>
+                <button style={{ padding: '6px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(stock)}>編輯</button>
+                <button style={{ padding: '6px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteStock(stock.id)}>刪除</button>
               </div>
               {stock.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{stock.updatedAt}</div>}
             </div>
@@ -116,8 +116,8 @@ export default function Assets() {
               </div>
               <Row label="現有存款" value={`$${dep.amount.toLocaleString()}`} color="#10b981" isBold />
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
-                <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteDemand(dep.id)}>刪除</button>
+                <button style={{ padding: '6px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
+                <button style={{ padding: '6px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteDemand(dep.id)}>刪除</button>
               </div>
               {dep.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{dep.updatedAt}</div>}
             </div>
@@ -184,8 +184,8 @@ export default function Assets() {
               </div>
               
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
-                <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteFixed(dep.id)}>刪除</button>
+                <button style={{ padding: '6px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
+                <button style={{ padding: '6px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteFixed(dep.id)}>刪除</button>
               </div>
               {dep.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{dep.updatedAt}</div>}
             </div>

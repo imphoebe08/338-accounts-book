@@ -116,7 +116,7 @@ export default function Overview() {
 
       {/* 年月選擇器 */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
-        <button onClick={handlePrev} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>◀</button>
+        <button onClick={handlePrev} style={{ padding: '10px 20px', background: '#fff', color: '#5C5446', border: 'none', borderRadius: '24px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>◀</button>
         {viewMode === 'month' ? (
           <input 
             type="month" 
@@ -133,7 +133,7 @@ export default function Overview() {
         ) : (
           <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>{year} 年</span>
         )}
-        <button onClick={handleNext} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>▶</button>
+        <button onClick={handleNext} style={{ padding: '10px 20px', background: '#fff', color: '#5C5446', border: 'none', borderRadius: '24px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>▶</button>
       </div>
 
       {/* 本月收支摘要 */}
@@ -186,7 +186,7 @@ export default function Overview() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>{viewMode === 'month' ? '本月' : '本年'}收支紀錄 {selectedCategory && <span style={{ color: '#10b981' }}>(篩選: {selectedCategory})</span>}</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>{viewMode === 'month' ? '本月' : '本年'}收支紀錄 {selectedCategory && <span style={{ color: '#D5B77A' }}>(篩選: {selectedCategory})</span>}</h3>
         </div>
         {displayedTransactions.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>{selectedCategory ? `此分類${viewMode === 'month' ? '本月' : '本年'}尚無紀錄` : `這${viewMode === 'month' ? '個月' : '一年'}目前沒有紀錄喔！`}</div>
