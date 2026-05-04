@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth'
 import './layout.css'
-import Overview from './Overview'
-import Analysis from './Analysis'
-import Assets from './Assets'
-import Settings from './Settings'
 import TransactionModal from './TransactionModal'
 import AssetModal from './AssetModal'
+
+// 啟用路由懶加載 (Lazy Loading)，加速網頁首次載入速度
+const Overview = lazy(() => import('./Overview'));
+const Analysis = lazy(() => import('./Analysis'));
+const Assets = lazy(() => import('./Assets'));
+const Settings = lazy(() => import('./Settings'));
 
 function Layout({ children }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -61,7 +63,9 @@ function Layout({ children }) {
 
       {/* 主要內容區 */}
       <main className="content-area">
-        {children}
+        <Suspense fallback={<div style={{ display: 'flex', height: '50vh', justifyContent: 'center', alignItems: 'center', color: '#D5B77A', fontWeight: 'bold' }}>畫面載入中...</div>}>
+          {children}
+        </Suspense>
       </main>
 
       {/* 右下角新增按鈕 (FAB) */}

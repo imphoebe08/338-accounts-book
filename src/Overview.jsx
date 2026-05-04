@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -71,18 +71,21 @@ export default function Overview() {
   };
 
   // 依據選擇的年月過濾資料
-  const filteredTransactions = transactions.filter(tx => {
+  const filteredTransactions = useMemo(() => transactions.filter(tx => {
     const txDate = new Date(tx.date);
     if (viewMode === 'year') {
       return txDate.getFullYear() === year;
     }
     return txDate.getFullYear() === year && txDate.getMonth() + 1 === month;
-  });
-  const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+  }), [transactions, viewMode, year, month]);
+
+  const { totalIncome, totalExpense } = useMemo(() => ({
+    totalIncome: filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
+    totalExpense: filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  }), [filteredTransactions]);
 
   // 動態計算當月支出的圓餅圖資料
-  const pieData = Object.entries(
+  const pieData = useMemo(() => Object.entries(
     filteredTransactions
       .filter(t => t.type === 'expense')
       .reduce((acc, tx) => {
@@ -91,7 +94,7 @@ export default function Overview() {
       }, {})
   )
     .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value); // 依金額由大到小排序
+    .sort((a, b) => b.value - a.value), [filteredTransactions]); // 依金額由大到小排序
 
   // 根據點擊的圓餅圖色塊篩選顯示的項目
   const displayedTransactions = selectedCategory 

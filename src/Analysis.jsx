@@ -113,14 +113,14 @@ export default function Analysis() {
     });
   };
 
-  const primaryTx = getFilteredTx(transactions, filterYear, filterMonth, filterCategory, filterTxType, filterPayer);
-  const compTx = isComparing ? getFilteredTx(transactions, compYear, filterMonth ? compMonth : '', compCategory, compTxType, compPayer) : [];
+  // 使用 useMemo 快取過濾後的結果，避免每次切換 tab 都重新 filter
+  const primaryTx = useMemo(() => getFilteredTx(transactions, filterYear, filterMonth, filterCategory, filterTxType, filterPayer), [transactions, filterYear, filterMonth, filterCategory, filterTxType, filterPayer]);
+  const compTx = useMemo(() => isComparing ? getFilteredTx(transactions, compYear, filterMonth ? compMonth : '', compCategory, compTxType, compPayer) : [], [isComparing, transactions, compYear, compMonth, filterMonth, compCategory, compTxType, compPayer]);
 
   // 組合圖表時間軸資料 (Timeline Data)
-  let timelineData = [];
-  if (!filterMonth) {
-    // 主副條件皆為「年度」，顯示 12 個月
-    timelineData = Array.from({length: 12}, (_, i) => {
+  const timelineData = useMemo(() => {
+    if (!filterMonth) {
+      return Array.from({length: 12}, (_, i) => {
       const pTx = primaryTx.filter(t => new Date(t.date).getMonth() === i);
       const cTx = compTx.filter(t => new Date(t.date).getMonth() === i);
       return {
@@ -131,13 +131,12 @@ export default function Analysis() {
         比較條件_支出: cTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
       };
     });
-  } else {
-    // 主副條件皆為「月份」，顯示該月每一天
-    const daysInPrimary = new Date(filterYear, filterMonth, 0).getDate();
-    const daysInComp = isComparing ? new Date(compYear, compMonth || filterMonth, 0).getDate() : daysInPrimary;
-    const maxDays = Math.max(daysInPrimary, daysInComp);
+    } else {
+      const daysInPrimary = new Date(filterYear, filterMonth, 0).getDate();
+      const daysInComp = isComparing ? new Date(compYear, compMonth || filterMonth, 0).getDate() : daysInPrimary;
+      const maxDays = Math.max(daysInPrimary, daysInComp);
     
-    timelineData = Array.from({length: maxDays}, (_, i) => {
+      return Array.from({length: maxDays}, (_, i) => {
       const pTx = primaryTx.filter(t => new Date(t.date).getDate() === i+1);
       const cTx = compTx.filter(t => new Date(t.date).getDate() === i+1);
       return {
@@ -148,49 +147,55 @@ export default function Analysis() {
         比較條件_支出: cTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
       };
     });
-  }
+    }
+  }, [filterMonth, filterYear, primaryTx, isComparing, compYear, compMonth, compTx]);
 
   // 供圓餅圖使用 (Yearly/Monthly Summary)
-  let yearlySummaryData = [];
-  if (filterTxType === 'income' || filterTxType === 'expense') {
-    const map = {};
-    primaryTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
-    yearlySummaryData = Object.entries(map).map(([name, value]) => ({ name, value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
-  } else {
-    yearlySummaryData = [
-      { name: '收入', value: primaryTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
-      { name: '支出', value: primaryTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
-    ].filter(d => d.value > 0);
-  }
-
-  let compSummaryData = [];
-  if (isComparing) {
-    if (compTxType === 'income' || compTxType === 'expense') {
+  const { yearlySummaryData, compSummaryData } = useMemo(() => {
+    let yData = [];
+    if (filterTxType === 'income' || filterTxType === 'expense') {
       const map = {};
-      compTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
-      compSummaryData = Object.entries(map).map(([name, value]) => ({ name: name + '(比較)', value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+      primaryTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
+      yData = Object.entries(map).map(([name, value]) => ({ name, value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
     } else {
-      compSummaryData = [
-        { name: '收入(比較)', value: compTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
-        { name: '支出(比較)', value: compTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
+      yData = [
+        { name: '收入', value: primaryTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
+        { name: '支出', value: primaryTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
       ].filter(d => d.value > 0);
     }
-  }
+
+    let cData = [];
+    if (isComparing) {
+      if (compTxType === 'income' || compTxType === 'expense') {
+        const map = {};
+        compTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
+        cData = Object.entries(map).map(([name, value]) => ({ name: name + '(比較)', value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
+      } else {
+        cData = [
+          { name: '收入(比較)', value: compTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
+          { name: '支出(比較)', value: compTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
+        ].filter(d => d.value > 0);
+      }
+    }
+    return { yearlySummaryData: yData, compSummaryData: cData };
+  }, [filterTxType, primaryTx, isComparing, compTxType, compTx]);
 
   // 動態計算財產佔比
-  const assetDataMap = { '股票': 0, '活期存款': 0, '定期存款': 0 };
-  assets.forEach(asset => {
-    if (asset.type === 'stock') assetDataMap['股票'] += (Number(asset.shares) * Number(asset.cost)) || 0;
-    else if (asset.type === 'demand') assetDataMap['活期存款'] += Number(asset.amount) || 0;
-    else if (asset.type === 'fixed') {
-      let principal = Number(asset.amount) || 0;
-      if (asset.fixedType === '零存整付' && asset.durationMonths) {
-        principal = principal * Number(asset.durationMonths);
+  const dynamicAssetData = useMemo(() => {
+    const assetDataMap = { '股票': 0, '活期存款': 0, '定期存款': 0 };
+    assets.forEach(asset => {
+      if (asset.type === 'stock') assetDataMap['股票'] += (Number(asset.shares) * Number(asset.cost)) || 0;
+      else if (asset.type === 'demand') assetDataMap['活期存款'] += Number(asset.amount) || 0;
+      else if (asset.type === 'fixed') {
+        let principal = Number(asset.amount) || 0;
+        if (asset.fixedType === '零存整付' && asset.durationMonths) {
+          principal = principal * Number(asset.durationMonths);
+        }
+        assetDataMap['定期存款'] += principal;
       }
-      assetDataMap['定期存款'] += principal;
-    }
-  });
-  const dynamicAssetData = Object.entries(assetDataMap).filter(([_, val]) => val > 0).map(([name, value]) => ({ name, value }));
+    });
+    return Object.entries(assetDataMap).filter(([_, val]) => val > 0).map(([name, value]) => ({ name, value }));
+  }, [assets]);
 
   // 計算圖例比例 (分開處理主條件與比較條件)
   const totalPrimary = yearlySummaryData.reduce((sum, d) => sum + d.value, 0);
@@ -208,61 +213,63 @@ export default function Analysis() {
   };
 
   // 處理狀態明細比較表資料
-  let tableData = [];
-  if (compareCondition === 'expense_ratio') {
-    const getExpRatio = (txs) => {
-      const expTx = txs.filter(t => t.type === 'expense');
-      const totalExp = expTx.reduce((sum, t) => sum + t.amount, 0);
-      const map = {};
-      expTx.forEach(t => map[t.category] = (map[t.category] || 0) + t.amount);
-      return { totalExp, map };
-    };
-    const pData = getExpRatio(primaryTx);
-    const cData = isComparing ? getExpRatio(compTx) : null;
-    
-    const allCatNames = new Set([...Object.keys(pData.map), ...(cData ? Object.keys(cData.map) : [])]);
-    tableData = Array.from(allCatNames).map(name => {
-      const pAmt = pData.map[name] || 0;
-      const pRat = pData.totalExp > 0 ? ((pAmt / pData.totalExp) * 100).toFixed(1) + '%' : '0%';
-      const cAmt = cData ? (cData.map[name] || 0) : null;
-      const cRat = cData ? (cData.totalExp > 0 ? ((cAmt / cData.totalExp) * 100).toFixed(1) + '%' : '0%') : null;
-      return { name, pAmt, pRat, cAmt, cRat };
-    }).sort((a, b) => b.pAmt - a.pAmt);
-  } else if (compareCondition === 'income_expense') {
-    const getIncExp = (txs) => {
-      const inc = txs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-      const exp = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
-      return { inc, exp, bal: inc - exp };
-    };
-    const pData = getIncExp(primaryTx);
-    const cData = isComparing ? getIncExp(compTx) : null;
-    const calcRatio = (val, inc) => inc > 0 ? ((val / inc) * 100).toFixed(1) + '%' : (val === inc && val > 0 ? '100%' : 'N/A');
-    
-    tableData = [
-      { name: '總收入', pAmt: pData.inc, pRat: pData.inc > 0 ? '100%' : '0%', cAmt: cData?.inc, cRat: cData?.inc > 0 ? '100%' : '0%' },
-      { name: '總支出', pAmt: pData.exp, pRat: calcRatio(pData.exp, pData.inc), cAmt: cData?.exp, cRat: cData ? calcRatio(cData.exp, cData.inc) : null },
-      { name: '結餘', pAmt: pData.bal, pRat: calcRatio(pData.bal, pData.inc), cAmt: cData?.bal, cRat: cData ? calcRatio(cData.bal, cData.inc) : null }
-    ];
-  } else if (compareCondition === 'payer_ratio') {
-    const getPayerRatio = (txs) => {
-      const expTx = txs.filter(t => t.type === 'expense');
-      const totalExp = expTx.reduce((sum, t) => sum + t.amount, 0);
-      const map = {};
-      expTx.forEach(t => map[t.payer || '未知'] = (map[t.payer || '未知'] || 0) + t.amount);
-      return { totalExp, map };
-    };
-    const pData = getPayerRatio(primaryTx);
-    const cData = isComparing ? getPayerRatio(compTx) : null;
-    
-    const allPayerNames = new Set([...Object.keys(pData.map), ...(cData ? Object.keys(cData.map) : [])]);
-    tableData = Array.from(allPayerNames).map(name => {
-      const pAmt = pData.map[name] || 0;
-      const pRat = pData.totalExp > 0 ? ((pAmt / pData.totalExp) * 100).toFixed(1) + '%' : '0%';
-      const cAmt = cData ? (cData.map[name] || 0) : null;
-      const cRat = cData ? (cData.totalExp > 0 ? ((cAmt / cData.totalExp) * 100).toFixed(1) + '%' : '0%') : null;
-      return { name, pAmt, pRat, cAmt, cRat };
-    }).sort((a, b) => b.pAmt - a.pAmt);
-  }
+  const tableData = useMemo(() => {
+    if (compareCondition === 'expense_ratio') {
+      const getExpRatio = (txs) => {
+        const expTx = txs.filter(t => t.type === 'expense');
+        const totalExp = expTx.reduce((sum, t) => sum + t.amount, 0);
+        const map = {};
+        expTx.forEach(t => map[t.category] = (map[t.category] || 0) + t.amount);
+        return { totalExp, map };
+      };
+      const pData = getExpRatio(primaryTx);
+      const cData = isComparing ? getExpRatio(compTx) : null;
+      
+      const allCatNames = new Set([...Object.keys(pData.map), ...(cData ? Object.keys(cData.map) : [])]);
+      return Array.from(allCatNames).map(name => {
+        const pAmt = pData.map[name] || 0;
+        const pRat = pData.totalExp > 0 ? ((pAmt / pData.totalExp) * 100).toFixed(1) + '%' : '0%';
+        const cAmt = cData ? (cData.map[name] || 0) : null;
+        const cRat = cData ? (cData.totalExp > 0 ? ((cAmt / cData.totalExp) * 100).toFixed(1) + '%' : '0%') : null;
+        return { name, pAmt, pRat, cAmt, cRat };
+      }).sort((a, b) => b.pAmt - a.pAmt);
+    } else if (compareCondition === 'income_expense') {
+      const getIncExp = (txs) => {
+        const inc = txs.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+        const exp = txs.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+        return { inc, exp, bal: inc - exp };
+      };
+      const pData = getIncExp(primaryTx);
+      const cData = isComparing ? getIncExp(compTx) : null;
+      const calcRatio = (val, inc) => inc > 0 ? ((val / inc) * 100).toFixed(1) + '%' : (val === inc && val > 0 ? '100%' : 'N/A');
+      
+      return [
+        { name: '總收入', pAmt: pData.inc, pRat: pData.inc > 0 ? '100%' : '0%', cAmt: cData?.inc, cRat: cData?.inc > 0 ? '100%' : '0%' },
+        { name: '總支出', pAmt: pData.exp, pRat: calcRatio(pData.exp, pData.inc), cAmt: cData?.exp, cRat: cData ? calcRatio(cData.exp, cData.inc) : null },
+        { name: '結餘', pAmt: pData.bal, pRat: calcRatio(pData.bal, pData.inc), cAmt: cData?.bal, cRat: cData ? calcRatio(cData.bal, cData.inc) : null }
+      ];
+    } else if (compareCondition === 'payer_ratio') {
+      const getPayerRatio = (txs) => {
+        const expTx = txs.filter(t => t.type === 'expense');
+        const totalExp = expTx.reduce((sum, t) => sum + t.amount, 0);
+        const map = {};
+        expTx.forEach(t => map[t.payer || '未知'] = (map[t.payer || '未知'] || 0) + t.amount);
+        return { totalExp, map };
+      };
+      const pData = getPayerRatio(primaryTx);
+      const cData = isComparing ? getPayerRatio(compTx) : null;
+      
+      const allPayerNames = new Set([...Object.keys(pData.map), ...(cData ? Object.keys(cData.map) : [])]);
+      return Array.from(allPayerNames).map(name => {
+        const pAmt = pData.map[name] || 0;
+        const pRat = pData.totalExp > 0 ? ((pAmt / pData.totalExp) * 100).toFixed(1) + '%' : '0%';
+        const cAmt = cData ? (cData.map[name] || 0) : null;
+        const cRat = cData ? (cData.totalExp > 0 ? ((cAmt / cData.totalExp) * 100).toFixed(1) + '%' : '0%') : null;
+        return { name, pAmt, pRat, cAmt, cRat };
+      }).sort((a, b) => b.pAmt - a.pAmt);
+    }
+    return [];
+  }, [compareCondition, primaryTx, isComparing, compTx]);
 
   const selectStyle = { padding: '8px 12px', borderRadius: '16px', border: '1px solid #EAE3D2', color: '#5C5446', fontSize: '14px', background: '#fff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' };
 
@@ -275,11 +282,11 @@ export default function Analysis() {
   const cExpName = compTxType ? compTitle : `${compTitle} - 支出`;
 
   // 財產明細資料
-  const assetTableData = dynamicAssetData.map(d => ({
-    name: d.name,
-    amount: d.value,
-    ratio: totalAssets > 0 ? ((d.value / totalAssets) * 100).toFixed(1) + '%' : '0%'
-  })).sort((a, b) => b.amount - a.amount);
+  const assetTableData = useMemo(() => dynamicAssetData.map(d => ({
+      name: d.name,
+      amount: d.value,
+      ratio: totalAssets > 0 ? ((d.value / totalAssets) * 100).toFixed(1) + '%' : '0%'
+    })).sort((a, b) => b.amount - a.amount), [dynamicAssetData, totalAssets]);
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>

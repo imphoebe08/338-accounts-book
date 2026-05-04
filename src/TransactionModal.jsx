@@ -53,8 +53,8 @@ export default function TransactionModal({ onClose, editData }) {
   const handleSubmit = async () => {
     let finalAmount = 0;
     try {
-      // eslint-disable-next-line no-eval
-      finalAmount = eval(amount); 
+      // 使用 Function 取代 eval，提升安全性與解析效能
+      finalAmount = new Function('return ' + amount)();
     } catch (e) {
       alert('計算錯誤，請檢查輸入內容');
       return;
