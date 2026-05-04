@@ -139,7 +139,7 @@ export default function Assets() {
           {fixedList.map(dep => (
             <div className="card" key={dep.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <strong>{dep.item}</strong>
+                <strong>{dep.item} {dep.fixedType && <span style={{ color: '#8b5cf6', fontSize: '13px', marginLeft: '4px' }}>[{dep.fixedType}]</span>}</strong>
                 <span style={{ color: '#666', fontSize: '14px' }}>{dep.holder || dep.depositor} ({dep.bank})</span>
               </div>
               <Row label="現有存款" value={`$${dep.amount.toLocaleString()}`} color="#10b981" isBold />

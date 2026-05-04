@@ -6,7 +6,7 @@ import { STOCKS, BANKS, PAYERS } from './config';
 export default function AssetModal({ onClose }) {
   const [assetType, setAssetType] = useState('stock'); // 'stock', 'demand', 'fixed'
   const [formData, setFormData] = useState({
-    item: '', shares: '', cost: '', bank: '', holder: '', amount: ''
+    item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'
   });
 
   const [configData, setConfigData] = useState({
@@ -52,6 +52,9 @@ export default function AssetModal({ onClose }) {
         baseData.refPrice = baseData.cost; // 股票剛新增時參考價為預設成本
       } else {
         baseData.amount = Number(formData.amount) || 0;
+        if (assetType === 'fixed') {
+          baseData.fixedType = formData.fixedType || '整存整付';
+        }
       }
       await addDoc(collection(db, 'assets'), baseData);
       onClose();
@@ -65,9 +68,9 @@ export default function AssetModal({ onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: ''}); }}>股票</button>
-          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: ''}); }}>活期存款</button>
-          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: ''}); }}>定期存款</button>
+          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>股票</button>
+          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>活期存款</button>
+          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>定期存款</button>
         </div>
         
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff' }}>
@@ -104,7 +107,15 @@ export default function AssetModal({ onClose }) {
               <input type="number" name="cost" placeholder="持有均價" value={formData.cost} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
             </>
           ) : (
-            <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+            <>
+              {assetType === 'fixed' && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
+                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '整存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '整存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '整存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>整存整付</button>
+                  <button onClick={() => setFormData(prev => ({...prev, fixedType: '零存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '零存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '零存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>零存整付</button>
+                </div>
+              )}
+              <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+            </>
           )}
           
           <button onClick={handleSubmit} style={{ width: '100%', padding: '14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>完成</button>
