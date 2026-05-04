@@ -22,9 +22,9 @@ const renderCustomizedLabel = ({ x, y, cx, percent, value, name }) => {
 };
 
 // 動態產生圖表標題
-const generateTitle = (y, m, timeT, txT, cat, payer) => {
+const generateTitle = (y, m, txT, cat, payer) => {
   let title = `${y}年`;
-  if (timeT === 'month') title += `${m}月`;
+  if (m) title += `${m}月`;
   if (txT === 'income') title += '收入';
   else if (txT === 'expense') title += '支出';
   else title += '收支';
@@ -40,9 +40,8 @@ export default function Analysis() {
   const [assets, setAssets] = useState([]);
 
   // 共用主條件
-  const [timeType, setTimeType] = useState('year'); // 'year', 'month'
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
-  const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
+  const [filterMonth, setFilterMonth] = useState(''); // '' 表示全年
   const [filterCategory, setFilterCategory] = useState('');
   const [filterTxType, setFilterTxType] = useState(''); // '' 表示所有收支
   const [filterPayer, setFilterPayer] = useState('');
@@ -50,7 +49,7 @@ export default function Analysis() {
   // 比較條件
   const [isComparing, setIsComparing] = useState(false);
   const [compYear, setCompYear] = useState(new Date().getFullYear() - 1);
-  const [compMonth, setCompMonth] = useState(new Date().getMonth() + 1);
+  const [compMonth, setCompMonth] = useState(new Date().getMonth() + 1); // 有篩選主月份時才會出現
   const [compCategory, setCompCategory] = useState('');
   const [compTxType, setCompTxType] = useState(''); // '' 表示所有收支
   const [compPayer, setCompPayer] = useState('');
@@ -87,11 +86,11 @@ export default function Analysis() {
   }, [transactions]);
 
   // 過濾資料的共用函數
-  const getFilteredTx = (txs, tType, y, m, cat, txType, payer) => {
+  const getFilteredTx = (txs, y, m, cat, txType, payer) => {
     return txs.filter(tx => {
       const date = new Date(tx.date);
       const matchYear = date.getFullYear() === y;
-      const matchMonth = tType === 'month' ? (date.getMonth() + 1 === m) : true;
+      const matchMonth = m ? (date.getMonth() + 1 === m) : true;
       const matchCat = cat ? tx.category === cat : true;
       const matchTxType = txType ? tx.type === txType : true;
       const matchPayer = payer ? tx.payer === payer : true;
@@ -99,12 +98,12 @@ export default function Analysis() {
     });
   };
 
-  const primaryTx = getFilteredTx(transactions, timeType, filterYear, filterMonth, filterCategory, filterTxType, filterPayer);
-  const compTx = isComparing ? getFilteredTx(transactions, timeType, compYear, compMonth, compCategory, compTxType, compPayer) : [];
+  const primaryTx = getFilteredTx(transactions, filterYear, filterMonth, filterCategory, filterTxType, filterPayer);
+  const compTx = isComparing ? getFilteredTx(transactions, compYear, filterMonth ? compMonth : '', compCategory, compTxType, compPayer) : [];
 
   // 組合圖表時間軸資料 (Timeline Data)
   let timelineData = [];
-  if (timeType === 'year') {
+  if (!filterMonth) {
     // 主副條件皆為「年度」，顯示 12 個月
     timelineData = Array.from({length: 12}, (_, i) => {
       const pTx = primaryTx.filter(t => new Date(t.date).getMonth() === i);
@@ -117,10 +116,10 @@ export default function Analysis() {
         比較條件_支出: cTx.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0),
       };
     });
-  } else if (timeType === 'month') {
+  } else {
     // 主副條件皆為「月份」，顯示該月每一天
     const daysInPrimary = new Date(filterYear, filterMonth, 0).getDate();
-    const daysInComp = isComparing ? new Date(compYear, compMonth, 0).getDate() : daysInPrimary;
+    const daysInComp = isComparing ? new Date(compYear, compMonth || filterMonth, 0).getDate() : daysInPrimary;
     const maxDays = Math.max(daysInPrimary, daysInComp);
     
     timelineData = Array.from({length: maxDays}, (_, i) => {
@@ -247,8 +246,8 @@ export default function Analysis() {
   const selectStyle = { padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', color: '#333', fontSize: '14px', background: '#fff' };
 
   // 為圖表產生相對應名稱
-  const primaryTitle = generateTitle(filterYear, filterMonth, timeType, filterTxType, filterCategory, filterPayer);
-  const compTitle = isComparing ? generateTitle(compYear, compMonth, timeType, compTxType, compCategory, compPayer) : '';
+  const primaryTitle = generateTitle(filterYear, filterMonth, filterTxType, filterCategory, filterPayer);
+  const compTitle = isComparing ? generateTitle(compYear, filterMonth ? compMonth : '', compTxType, compCategory, compPayer) : '';
   const pIncName = filterTxType ? primaryTitle : `${primaryTitle} - 收入`;
   const pExpName = filterTxType ? primaryTitle : `${primaryTitle} - 支出`;
   const cIncName = compTxType ? compTitle : `${compTitle} - 收入`;
@@ -264,18 +263,13 @@ export default function Analysis() {
       <div className="card" style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 'bold', minWidth: '60px' }}>主條件:</span>
-          <select value={timeType} onChange={e => setTimeType(e.target.value)} style={selectStyle}>
-            <option value="year">年度</option>
-            <option value="month">月份</option>
-          </select>
           <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} style={selectStyle}>
             {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
           </select>
-          {timeType === 'month' && (
-            <select value={filterMonth} onChange={e => setFilterMonth(Number(e.target.value))} style={selectStyle}>
-              {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
-            </select>
-          )}
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value ? Number(e.target.value) : '')} style={selectStyle}>
+            <option value="">全年</option>
+            {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
+          </select>
           <select value={filterTxType} onChange={e => setFilterTxType(e.target.value)} style={selectStyle}>
             <option value="">所有收支</option>
             <option value="income">收入</option>
@@ -302,7 +296,7 @@ export default function Analysis() {
             <select value={compYear} onChange={e => setCompYear(Number(e.target.value))} style={selectStyle}>
               {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
             </select>
-            {timeType === 'month' && (
+            {filterMonth !== '' && (
               <select value={compMonth} onChange={e => setCompMonth(Number(e.target.value))} style={selectStyle}>
                 {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
               </select>
@@ -333,9 +327,9 @@ export default function Analysis() {
         <div className="card" style={{ marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>
-              {generateTitle(filterYear, filterMonth, timeType, filterTxType, filterCategory, filterPayer)}
+              {primaryTitle}
               {isComparing && (
-                <span style={{ color: '#8b5cf6', fontSize: '14px', marginLeft: '8px' }}>vs {generateTitle(compYear, compMonth, timeType, compTxType, compCategory, compPayer)}</span>
+                <span style={{ color: '#8b5cf6', fontSize: '14px', marginLeft: '8px' }}>vs {compTitle}</span>
               )}
             </h3>
             <div style={{ display: 'flex', gap: '5px' }}>

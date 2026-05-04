@@ -1,59 +1,64 @@
-import { useState } from 'react';
-
-// 模擬資料
-const initialStocks = [
-  { id: 1, item: '台積電 (2330)', shares: 1000, refPrice: 850, cost: 600, bank: '元大證券', holder: '自己', updatedAt: '2026-05-01' },
-  { id: 2, item: '0050', shares: 500, refPrice: 150, cost: 130, bank: '富邦證券', holder: 'Bobo', updatedAt: '2026-05-01' },
-];
-const demandDeposits = [
-  { id: 1, item: '薪轉戶', amount: 150000, bank: '中國信託', depositor: '自己' },
-  { id: 2, item: '共同基金', amount: 80000, bank: '玉山銀行', depositor: 'Bobo' },
-];
-const fixedDeposits = [
-  { id: 1, item: '美金定存', amount: 300000, bank: '國泰世華', depositor: '自己' },
-];
+import { useState, useEffect } from 'react';
+import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 export default function Assets() {
-  const [stocks, setStocks] = useState(initialStocks);
-  const [demandList, setDemandList] = useState(demandDeposits);
-  const [fixedList, setFixedList] = useState(fixedDeposits);
+  const [stocks, setStocks] = useState([]);
+  const [demandList, setDemandList] = useState([]);
+  const [fixedList, setFixedList] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
+
+  // 真實從 Firebase 取回所有財產
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'assets'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStocks(data.filter(d => d.type === 'stock'));
+      setDemandList(data.filter(d => d.type === 'demand'));
+      setFixedList(data.filter(d => d.type === 'fixed'));
+    });
+    return () => unsub();
+  }, []);
 
   // 真實串接 Yahoo Finance API 更新收盤價
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
-      const updatedStocks = await Promise.all(stocks.map(async (stock) => {
+      let successCount = 0;
+      await Promise.all(stocks.map(async (stock) => {
         const match = stock.item.match(/\d{4}/); // 自動提取四位數股票代號
-        if (!match) return stock;
+        if (!match) return;
         
         const symbol = match[0];
-        // 使用 Yahoo Finance API 搭配 CORS proxy 取得台股報價
         const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.TW?interval=1d`;
-        // 改用 corsproxy.io，因為 allorigins 常常被 Yahoo 擋下導致 522 錯誤
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        // 改用 allorigins 的 /get 端點，由伺服器代理解壓縮並以字串包裝，避免二進位亂碼解析錯誤
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
         
         try {
           const res = await fetch(proxyUrl);
-          const data = await res.json();
-          const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          const today = new Date().toISOString().split('T')[0];
-          if (price) return { ...stock, refPrice: price, updatedAt: today };
+          const wrapper = await res.json();
+          
+          if (wrapper.contents) {
+            const data = JSON.parse(wrapper.contents);
+            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+            const today = new Date().toISOString().split('T')[0];
+            if (price) {
+              await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
+              successCount++;
+            }
+          }
         } catch (err) {
           console.error(`抓取 ${symbol} 失敗:`, err);
         }
-        return stock;
       }));
-      setStocks(updatedStocks);
-      alert('股價更新完成！\n（註：若仍有失敗項目，可能是免費 Proxy 伺服器不穩定，未來佈署 Vercel 後可徹底解決）');
+      alert(`股價更新完成！(成功更新 ${successCount} 筆)\n（註：若仍有失敗項目，可能是 Proxy 不穩定）`);
     } finally {
       setIsFetching(false);
     }
   };
 
-  const handleDeleteStock = (id) => {
+  const handleDeleteStock = async (id) => {
     if (window.confirm('確定要刪除這筆股票嗎？')) {
-      setStocks(prev => prev.filter(stock => stock.id !== id));
+      await deleteDoc(doc(db, 'assets', id));
     }
   };
 
