@@ -11,7 +11,7 @@ const Analysis = lazy(() => import('./Analysis'));
 const Assets = lazy(() => import('./Assets'));
 const Settings = lazy(() => import('./Settings'));
 
-function Layout({ children }) {
+function Layout({ children, user }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const location = useLocation();
@@ -34,9 +34,23 @@ function Layout({ children }) {
   return (
     <div className="app-container">
       {/* 頂部導覽列 */}
-      <header className="top-bar">
-        <button className="hamburger-btn" onClick={() => setIsMenuOpen(true)}>☰</button>
-        <h1 style={{ fontSize: '18px', margin: 0 }}>簡單記帳</h1>
+      <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button className="hamburger-btn" onClick={() => setIsMenuOpen(true)}>☰</button>
+          <h1 style={{ fontSize: '18px', margin: 0 }}>簡單記帳</h1>
+        </div>
+        {user && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: '500', color: '#5C5446' }}>{user.displayName}</span>
+            {user.photoURL ? (
+              <img src={user.photoURL} alt="avatar" style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #EAE3D2' }} />
+            ) : (
+              <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#D5B77A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                {user.displayName?.[0] || 'U'}
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
       {/* 側邊欄遮罩 */}
@@ -115,7 +129,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Layout>
+      <Layout user={user}>
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/analysis" element={<Analysis />} />

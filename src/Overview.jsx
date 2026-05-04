@@ -28,6 +28,7 @@ export default function Overview() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingTx, setEditingTx] = useState(null);
   const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
+  const [showLegend, setShowLegend] = useState(false);
 
   const handlePrev = () => {
     if (viewMode === 'year') {
@@ -140,18 +141,18 @@ export default function Overview() {
       </div>
 
       {/* 本月收支摘要 */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
-        <div className="card" style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>{viewMode === 'month' ? '本月' : '本年'}收入</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toLocaleString()}</div>
+      <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '10px' }}>
+          <span style={{ color: '#666', fontSize: '15px' }}>{viewMode === 'month' ? '本月' : '本年'}收入</span>
+          <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toLocaleString()}</span>
         </div>
-        <div className="card" style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>{viewMode === 'month' ? '本月' : '本年'}支出</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${totalExpense.toLocaleString()}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '10px' }}>
+          <span style={{ color: '#666', fontSize: '15px' }}>{viewMode === 'month' ? '本月' : '本年'}支出</span>
+          <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>${totalExpense.toLocaleString()}</span>
         </div>
-        <div className="card" style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>結餘</div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#333' }}>${(totalIncome - totalExpense).toLocaleString()}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: '#666', fontSize: '15px', fontWeight: 'bold' }}>結餘</span>
+          <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${(totalIncome - totalExpense).toLocaleString()}</span>
         </div>
       </div>
 
@@ -159,31 +160,66 @@ export default function Overview() {
       <div className="card" style={{ marginBottom: '20px' }}>
         <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333', textAlign: 'center' }}>{viewMode === 'month' ? '本月' : '本年'}支出佔比</h3>
         {pieData.length === 0 ? (
-          <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無支出紀錄</div>
+          <div style={{ display: 'flex', height: '300px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無支出紀錄</div>
         ) : (
-          <div style={{ width: '100%', minHeight: '450px' }}>
-          <ResponsiveContainer width="100%" height={450}>
-            <PieChart>
-              <Pie 
-                data={pieData} 
-                cx="50%" cy="50%" 
-                innerRadius={60} outerRadius={120} 
-                paddingAngle={5} 
-                dataKey="value"
-                labelLine={true}
-                label={renderCustomizedLabel}
-                onClick={(entry) => setSelectedCategory(selectedCategory === entry.name ? null : entry.name)}
-                style={{ cursor: 'pointer' }}
+          <>
+            <div style={{ position: 'relative', width: '100%', minHeight: '300px' }}>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                <div style={{ fontSize: '12px', color: '#999' }}>結餘</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${(totalIncome - totalExpense).toLocaleString()}</div>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie 
+                    data={pieData} 
+                    cx="50%" cy="50%" 
+                    innerRadius={75} outerRadius={115} 
+                    paddingAngle={5} 
+                    dataKey="value"
+                    labelLine={false}
+                    onClick={(entry) => setSelectedCategory(selectedCategory === entry.name ? null : entry.name)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} opacity={selectedCategory === null || selectedCategory === entry.name ? 1 : 0.3} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            
+            {/* 收縮與展開的類別選單 */}
+            <div style={{ marginTop: '10px' }}>
+              <button 
+                onClick={() => setShowLegend(!showLegend)} 
+                style={{ width: '100%', padding: '10px', background: '#F8F6F0', color: '#D5B77A', border: '1px solid #EAE3D2', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
               >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} opacity={selectedCategory === null || selectedCategory === entry.name ? 1 : 0.3} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-              <Legend wrapperStyle={{ paddingTop: '20px' }} formatter={renderLegendText} />
-            </PieChart>
-          </ResponsiveContainer>
-          </div>
+                {showLegend ? '隱藏類別詳細資訊 ▲' : '展開類別詳細資訊 ▼'}
+              </button>
+              
+              {showLegend && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '15px' }}>
+                  {pieData.map((entry, index) => {
+                    const percentage = totalPieValue > 0 ? ((entry.value / totalPieValue) * 100).toFixed(1) : 0;
+                    return (
+                      <div 
+                        key={index} 
+                        onClick={() => setSelectedCategory(selectedCategory === entry.name ? null : entry.name)}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px', background: selectedCategory === entry.name ? '#fef3c7' : '#fff', border: '1px solid #eee', borderRadius: '8px', cursor: 'pointer' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: COLORS[index % COLORS.length] }}></div>
+                          <span style={{ color: '#333' }}>{entry.name}</span>
+                        </div>
+                        <div style={{ color: '#666', fontWeight: '500' }}>{percentage}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

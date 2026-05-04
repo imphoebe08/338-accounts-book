@@ -202,13 +202,18 @@ export default function Assets() {
 
 // 共用排版元件
 function Section({ title, action, children }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <div style={{ marginBottom: '30px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3 style={{ margin: 0, color: '#333' }}>{title}</h3>
-        {action}
+      <div 
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', cursor: 'pointer', padding: '12px 15px', background: '#F8F6F0', borderRadius: '12px' }}
+        onClick={(e) => { if (e.target.tagName !== 'BUTTON') setIsOpen(!isOpen); }}
+      >
+        <h3 style={{ margin: 0, color: '#333', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>{title} <span style={{ fontSize: '12px', color: '#999' }}>{isOpen ? '▲' : '▼'}</span></h3>
+        {action && <div onClick={e => e.stopPropagation()}>{action}</div>}
       </div>
-      {children}
+      {isOpen && children}
     </div>
   );
 }

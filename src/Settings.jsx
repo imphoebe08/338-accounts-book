@@ -164,27 +164,23 @@ export default function Settings() {
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <h2 style={{ marginBottom: '20px' }}>設定</h2>
       
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginTop: 0, color: '#ef4444', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>支出設定</h3>
+      <CollapsibleCard title="支出設定" titleColor="#ef4444">
         <h4 style={{ color: '#333', fontSize: '15px' }}>分類管理</h4>
         <ManageList items={expenseCats} onUpdate={(list) => updateSetting('expenseCats', list)} label="支出分類" color="#ef4444" />
         
         <h4 style={{ color: '#333', fontSize: '15px' }}>快捷輸入管理</h4>
         <ManageList items={expenseShorts} onUpdate={(list) => updateSetting('expenseShorts', list)} label="支出快捷" color="#ef4444" />
-      </div>
+      </CollapsibleCard>
 
-      <div className="card">
-        <h3 style={{ marginTop: 0, color: '#10b981', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>收入設定</h3>
+      <CollapsibleCard title="收入設定" titleColor="#10b981">
         <h4 style={{ color: '#333', fontSize: '15px' }}>分類管理</h4>
         <ManageList items={incomeCats} onUpdate={(list) => updateSetting('incomeCats', list)} label="收入分類" color="#10b981" />
 
         <h4 style={{ color: '#333', fontSize: '15px' }}>快捷輸入管理</h4>
         <ManageList items={incomeShorts} onUpdate={(list) => updateSetting('incomeShorts', list)} label="收入快捷" color="#10b981" />
-      </div>
+      </CollapsibleCard>
 
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginTop: 0, color: '#3b82f6', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>其他管理</h3>
-        
+      <CollapsibleCard title="其他管理" titleColor="#3b82f6">
         <h4 style={{ color: '#333', fontSize: '15px' }}>付款/存款/持有人設定</h4>
         <ManageList items={payers} onUpdate={(list) => updateSetting('payers', list)} label="付款/存款/持有人" color="#3b82f6" />
 
@@ -193,10 +189,9 @@ export default function Settings() {
 
         <h4 style={{ color: '#333', fontSize: '15px' }}>銀行與券商管理</h4>
         <ManageList items={banks} onUpdate={(list) => updateSetting('banks', list)} label="銀行與券商" color="#3b82f6" />
-      </div>
+      </CollapsibleCard>
 
-      <div className="card">
-        <h3 style={{ marginTop: 0, color: '#8b5cf6', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>資料匯入</h3>
+      <CollapsibleCard title="資料匯入" titleColor="#8b5cf6">
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>支援 Notion CSV 匯入，請確保第一行欄位標題包含：「內容,付款人,分類,日期,金額」。請將收入與支出分開上傳：</p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -209,8 +204,25 @@ export default function Settings() {
             <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F8F6F0', boxSizing: 'border-box' }} />
           </div>
         </div>
-      </div>
+      </CollapsibleCard>
 
+    </div>
+  );
+}
+
+// 收縮/展開卡片元件
+function CollapsibleCard({ title, titleColor, children }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="card" style={{ marginBottom: '20px' }}>
+      <h3 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ margin: 0, marginTop: 0, color: titleColor, borderBottom: isOpen ? '1px solid #eee' : 'none', paddingBottom: isOpen ? '10px' : '0', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}
+      >
+        {title}
+        <span style={{ fontSize: '14px', color: '#999' }}>{isOpen ? '▲' : '▼'}</span>
+      </h3>
+      {isOpen && <div style={{ marginTop: '15px' }}>{children}</div>}
     </div>
   );
 }
