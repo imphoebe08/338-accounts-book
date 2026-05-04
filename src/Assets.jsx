@@ -130,26 +130,41 @@ export default function Assets() {
           {fixedList.map(dep => {
             let expectedInterest = 0;
             let totalPrincipal = Number(dep.amount) || 0;
-            let endDateStr = '';
+            let endDateStr = dep.endDate || '';
 
-            if (dep.interestRate && dep.durationMonths) {
+            // 自動計算為期月數
+            let m = Number(dep.durationMonths) || 0;
+            if (!m && dep.startDate && dep.endDate) {
+              const s = new Date(dep.startDate);
+              const e = new Date(dep.endDate);
+              m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+            }
+
+            if (dep.interestRate && m) {
               const r = Number(dep.interestRate) / 100;
-              const m = Number(dep.durationMonths);
+              const renewals = Number(dep.renewalCount) || 0;
+              const totalM = m * (1 + renewals); // 總期數
+
               if (dep.fixedType === '零存整付') {
-                totalPrincipal = totalPrincipal * m;
-                // 零存整付利息 = 每月本金 * 月利率 * (期數 * (期數 + 1) / 2)
-                expectedInterest = Math.round((Number(dep.amount) || 0) * (r / 12) * ((m * (m + 1)) / 2));
+                totalPrincipal = totalPrincipal * totalM;
+                // 零存整付利息 = 每月本金 * 月利率 * (總期數 * (總期數 + 1) / 2)
+                expectedInterest = Math.round((Number(dep.amount) || 0) * (r / 12) * ((totalM * (totalM + 1)) / 2));
               } else {
-                // 整存整付利息 = 本金 * 年利率 * (月數 / 12)
-                expectedInterest = Math.round(totalPrincipal * r * (m / 12));
+                expectedInterest = Math.round(totalPrincipal * r * (totalM / 12));
+              }
+
+              if (!endDateStr && dep.startDate) {
+                const endDate = new Date(dep.startDate);
+                endDate.setMonth(endDate.getMonth() + totalM);
+                endDateStr = endDate.toISOString().split('T')[0];
               }
             }
-
-            if (dep.startDate && dep.durationMonths) {
-              const endDate = new Date(dep.startDate);
-              endDate.setMonth(endDate.getMonth() + Number(dep.durationMonths));
-              endDateStr = endDate.toISOString().split('T')[0];
-            }
+            
+            const termLabel = [
+              m ? `${m} 個月` : '',
+              dep.renewalCount ? `(續存 ${dep.renewalCount} 次)` : '',
+              endDateStr ? `(至 ${endDateStr})` : ''
+            ].filter(Boolean).join(' ');
 
             return (
             <div className="card" key={dep.id}>
