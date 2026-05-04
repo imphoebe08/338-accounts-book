@@ -14,8 +14,8 @@ function Layout({ children }) {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', label: '本月收支', icon: '📝' },
-    { path: '/analysis', label: '總覽', icon: '📊' },
+    { path: '/', label: '收支總覽', icon: '📝' },
+    { path: '/analysis', label: '財況分析', icon: '📊' },
     { path: '/assets', label: '資產', icon: '💰' },
     { path: '/settings', label: '設定', icon: '⚙️' },
   ];

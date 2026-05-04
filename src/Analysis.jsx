@@ -182,7 +182,13 @@ export default function Analysis() {
   assets.forEach(asset => {
     if (asset.type === 'stock') assetDataMap['股票'] += (Number(asset.shares) * Number(asset.cost)) || 0;
     else if (asset.type === 'demand') assetDataMap['活期存款'] += Number(asset.amount) || 0;
-    else if (asset.type === 'fixed') assetDataMap['定期存款'] += Number(asset.amount) || 0;
+    else if (asset.type === 'fixed') {
+      let principal = Number(asset.amount) || 0;
+      if (asset.fixedType === '零存整付' && asset.durationMonths) {
+        principal = principal * Number(asset.durationMonths);
+      }
+      assetDataMap['定期存款'] += principal;
+    }
   });
   const dynamicAssetData = Object.entries(assetDataMap).filter(([_, val]) => val > 0).map(([name, value]) => ({ name, value }));
 

@@ -1,12 +1,23 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, collection, addDoc } from 'firebase/firestore';
+import { doc, onSnapshot, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { STOCKS, BANKS, PAYERS } from './config';
 
-export default function AssetModal({ onClose }) {
-  const [assetType, setAssetType] = useState('stock'); // 'stock', 'demand', 'fixed'
+export default function AssetModal({ onClose, editData }) {
+  const [assetType, setAssetType] = useState(editData?.type || 'stock'); // 'stock', 'demand', 'fixed'
   const [formData, setFormData] = useState({
-    item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'
+    item: editData?.item || '', 
+    shares: editData?.shares !== undefined ? String(editData.shares) : '', 
+    cost: editData?.cost !== undefined ? String(editData.cost) : '', 
+    bank: editData?.bank || '', 
+    holder: editData?.holder || '', 
+    amount: editData?.amount !== undefined ? String(editData.amount) : '', 
+    fixedType: editData?.fixedType || '整存整付', 
+    interestRate: editData?.interestRate !== undefined ? String(editData.interestRate) : '', 
+    startDate: editData?.startDate || '', 
+    endDate: editData?.endDate || '',
+    durationMonths: editData?.durationMonths !== undefined ? String(editData.durationMonths) : '',
+    renewalCount: editData?.renewalCount !== undefined ? String(editData.renewalCount) : ''
   });
 
   const [configData, setConfigData] = useState({
@@ -49,14 +60,27 @@ export default function AssetModal({ onClose }) {
       if (assetType === 'stock') {
         baseData.shares = Number(formData.shares) || 0;
         baseData.cost = Number(formData.cost) || 0;
-        baseData.refPrice = baseData.cost; // 股票剛新增時參考價為預設成本
+        if (editData && editData.refPrice !== undefined) {
+          baseData.refPrice = editData.refPrice; // 編輯時保留原有的參考價
+        } else {
+          baseData.refPrice = baseData.cost; // 股票剛新增時參考價為預設成本
+        }
       } else {
         baseData.amount = Number(formData.amount) || 0;
         if (assetType === 'fixed') {
           baseData.fixedType = formData.fixedType || '整存整付';
+          baseData.interestRate = Number(formData.interestRate) || 0;
+          baseData.startDate = formData.startDate || '';
+          baseData.endDate = formData.endDate || '';
+          baseData.durationMonths = Number(formData.durationMonths) || 0;
+          baseData.renewalCount = Number(formData.renewalCount) || 0;
         }
       }
-      await addDoc(collection(db, 'assets'), baseData);
+      if (editData) {
+        await updateDoc(doc(db, 'assets', editData.id), baseData);
+      } else {
+        await addDoc(collection(db, 'assets'), baseData);
+      }
       onClose();
     } catch (err) {
       console.error('新增資產失敗:', err);
@@ -68,9 +92,9 @@ export default function AssetModal({ onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>股票</button>
-          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>活期存款</button>
-          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付'}); }}>定期存款</button>
+          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
+          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
+          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
         </div>
         
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff' }}>
@@ -109,12 +133,26 @@ export default function AssetModal({ onClose }) {
           ) : (
             <>
               {assetType === 'fixed' && (
+                <>
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '5px' }}>
                   <button onClick={() => setFormData(prev => ({...prev, fixedType: '整存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '整存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '整存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>整存整付</button>
                   <button onClick={() => setFormData(prev => ({...prev, fixedType: '零存整付'}))} style={{ flex: 1, padding: '10px', background: formData.fixedType === '零存整付' ? '#10b981' : '#f0f2f5', color: formData.fixedType === '零存整付' ? '#fff' : '#333', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}>零存整付</button>
                 </div>
+                <input type="number" name="amount" placeholder={formData.fixedType === '零存整付' ? '每月存款金額' : '單筆存款金額'} value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                <input type="number" name="interestRate" placeholder="年利率 (%) (例如: 1.5)" value={formData.interestRate} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="date" name="startDate" placeholder="開始日期" value={formData.startDate} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                  <input type="date" name="endDate" placeholder="到期日 (點擊選擇)" value={formData.endDate} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="number" name="durationMonths" placeholder="為期 (個月)" value={formData.durationMonths} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                  <input type="number" name="renewalCount" placeholder="續存次數" value={formData.renewalCount} onChange={handleChange} style={{ flex: 1, padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+                </div>
+                </>
               )}
-              <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+              {assetType === 'demand' && (
+                <input type="number" name="amount" placeholder="現有存款金額" value={formData.amount} onChange={handleChange} style={{ width: '100%', padding: '10px', fontSize: '16px', border: '1px solid #ddd', borderRadius: '8px', boxSizing: 'border-box', color: '#333', background: '#fff' }} />
+              )}
             </>
           )}
           

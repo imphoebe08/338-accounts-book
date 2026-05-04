@@ -27,14 +27,23 @@ export default function Overview() {
   const [transactions, setTransactions] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingTx, setEditingTx] = useState(null);
+  const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
 
-  const handlePrevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const handlePrev = () => {
+    if (viewMode === 'year') {
+      setCurrentDate(new Date(currentDate.getFullYear() - 1, 1, 1));
+    } else {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    }
     setSelectedCategory(null);
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const handleNext = () => {
+    if (viewMode === 'year') {
+      setCurrentDate(new Date(currentDate.getFullYear() + 1, 1, 1));
+    } else {
+      setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    }
     setSelectedCategory(null);
   };
 
@@ -64,6 +73,9 @@ export default function Overview() {
   // 依據選擇的年月過濾資料
   const filteredTransactions = transactions.filter(tx => {
     const txDate = new Date(tx.date);
+    if (viewMode === 'year') {
+      return txDate.getFullYear() === year;
+    }
     return txDate.getFullYear() === year && txDate.getMonth() + 1 === month;
   });
   const totalIncome = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
@@ -96,32 +108,42 @@ export default function Overview() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       
+      {/* 頁籤切換 */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '20px' }}>
+        <button className={`tab-btn ${viewMode === 'month' ? 'active' : ''}`} onClick={() => setViewMode('month')}>本月</button>
+        <button className={`tab-btn ${viewMode === 'year' ? 'active' : ''}`} onClick={() => setViewMode('year')}>本年度</button>
+      </div>
+
       {/* 年月選擇器 */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
-        <button onClick={handlePrevMonth} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>◀</button>
-        <input 
-          type="month" 
-          value={`${year}-${String(month).padStart(2, '0')}`}
-          onClick={(e) => e.target.showPicker && e.target.showPicker()}
-          onChange={(e) => {
-            if (!e.target.value) return;
-            setSelectedCategory(null);
-            const [y, m] = e.target.value.split('-');
-            setCurrentDate(new Date(y, m - 1, 1));
-          }}
-          style={{ border: 'none', fontSize: '20px', fontWeight: 'bold', color: '#333', background: 'transparent', textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit' }}
-        />
-        <button onClick={handleNextMonth} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>▶</button>
+        <button onClick={handlePrev} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>◀</button>
+        {viewMode === 'month' ? (
+          <input 
+            type="month" 
+            value={`${year}-${String(month).padStart(2, '0')}`}
+            onClick={(e) => e.target.showPicker && e.target.showPicker()}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              setSelectedCategory(null);
+              const [y, m] = e.target.value.split('-');
+              setCurrentDate(new Date(y, m - 1, 1));
+            }}
+            style={{ border: 'none', fontSize: '20px', fontWeight: 'bold', color: '#333', background: 'transparent', textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit' }}
+          />
+        ) : (
+          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>{year} 年</span>
+        )}
+        <button onClick={handleNext} style={{ padding: '8px 16px', background: '#fff', color: '#333', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer' }}>▶</button>
       </div>
 
       {/* 本月收支摘要 */}
       <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
         <div className="card" style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>本月收入</div>
+          <div style={{ fontSize: '14px', color: '#666' }}>{viewMode === 'month' ? '本月' : '本年'}收入</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>${totalIncome.toLocaleString()}</div>
         </div>
         <div className="card" style={{ flex: 1, textAlign: 'center' }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>本月支出</div>
+          <div style={{ fontSize: '14px', color: '#666' }}>{viewMode === 'month' ? '本月' : '本年'}支出</div>
           <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#ef4444' }}>${totalExpense.toLocaleString()}</div>
         </div>
         <div className="card" style={{ flex: 1, textAlign: 'center' }}>
@@ -132,9 +154,9 @@ export default function Overview() {
 
       {/* 動態圓餅圖 */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333', textAlign: 'center' }}>本月支出佔比</h3>
+        <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333', textAlign: 'center' }}>{viewMode === 'month' ? '本月' : '本年'}支出佔比</h3>
         {pieData.length === 0 ? (
-          <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>本月尚無支出紀錄</div>
+          <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無支出紀錄</div>
         ) : (
           <div style={{ width: '100%', minHeight: '450px' }}>
           <ResponsiveContainer width="100%" height={450}>
@@ -164,10 +186,10 @@ export default function Overview() {
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>本月收支紀錄 {selectedCategory && <span style={{ color: '#10b981' }}>(篩選: {selectedCategory})</span>}</h3>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>{viewMode === 'month' ? '本月' : '本年'}收支紀錄 {selectedCategory && <span style={{ color: '#10b981' }}>(篩選: {selectedCategory})</span>}</h3>
         </div>
         {displayedTransactions.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>{selectedCategory ? '此分類本月尚無紀錄' : '這個月目前沒有紀錄喔！'}</div>
+          <div style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>{selectedCategory ? `此分類${viewMode === 'month' ? '本月' : '本年'}尚無紀錄` : `這${viewMode === 'month' ? '個月' : '一年'}目前沒有紀錄喔！`}</div>
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {displayedTransactions.map((tx) => (

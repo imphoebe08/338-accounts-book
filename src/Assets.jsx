@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import AssetModal from './AssetModal';
 
 export default function Assets() {
   const [stocks, setStocks] = useState([]);
   const [demandList, setDemandList] = useState([]);
   const [fixedList, setFixedList] = useState([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
 
   // 真實從 Firebase 取回所有財產
   useEffect(() => {
@@ -62,28 +64,16 @@ export default function Assets() {
     }
   };
 
-  const handleEditStock = (id) => {
-    alert('觸發編輯功能 (未來可串聯表單)，您欲編輯的 ID：' + id);
-  };
-
   const handleDeleteDemand = async (id) => {
     if (window.confirm('確定要刪除這筆活期存款嗎？')) {
       await deleteDoc(doc(db, 'assets', id));
     }
   };
 
-  const handleEditDemand = (id) => {
-    alert('觸發編輯功能 (未來可串聯表單)，您欲編輯的 ID：' + id);
-  };
-
   const handleDeleteFixed = async (id) => {
     if (window.confirm('確定要刪除這筆定期存款嗎？')) {
       await deleteDoc(doc(db, 'assets', id));
     }
-  };
-
-  const handleEditFixed = (id) => {
-    alert('觸發編輯功能 (未來可串聯表單)，您欲編輯的 ID：' + id);
   };
 
   return (
@@ -107,7 +97,7 @@ export default function Assets() {
                 <Row label="目前市值" value={`$${(stock.shares * stock.refPrice).toLocaleString()}`} color="#ef4444" isBold />
               </div>
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleEditStock(stock.id)}>編輯</button>
+                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(stock)}>編輯</button>
                 <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteStock(stock.id)}>刪除</button>
               </div>
               {stock.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{stock.updatedAt}</div>}
@@ -126,9 +116,10 @@ export default function Assets() {
               </div>
               <Row label="現有存款" value={`$${dep.amount.toLocaleString()}`} color="#10b981" isBold />
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleEditDemand(dep.id)}>編輯</button>
+                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
                 <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteDemand(dep.id)}>刪除</button>
               </div>
+              {dep.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{dep.updatedAt}</div>}
             </div>
           ))}
         </div>
@@ -136,21 +127,60 @@ export default function Assets() {
 
       <Section title="🔒 定期定額存款清單">
         <div className="card-grid">
-          {fixedList.map(dep => (
+          {fixedList.map(dep => {
+            let expectedInterest = 0;
+            let totalPrincipal = Number(dep.amount) || 0;
+            let endDateStr = '';
+
+            if (dep.interestRate && dep.durationMonths) {
+              const r = Number(dep.interestRate) / 100;
+              const m = Number(dep.durationMonths);
+              if (dep.fixedType === '零存整付') {
+                totalPrincipal = totalPrincipal * m;
+                // 零存整付利息 = 每月本金 * 月利率 * (期數 * (期數 + 1) / 2)
+                expectedInterest = Math.round((Number(dep.amount) || 0) * (r / 12) * ((m * (m + 1)) / 2));
+              } else {
+                // 整存整付利息 = 本金 * 年利率 * (月數 / 12)
+                expectedInterest = Math.round(totalPrincipal * r * (m / 12));
+              }
+            }
+
+            if (dep.startDate && dep.durationMonths) {
+              const endDate = new Date(dep.startDate);
+              endDate.setMonth(endDate.getMonth() + Number(dep.durationMonths));
+              endDateStr = endDate.toISOString().split('T')[0];
+            }
+
+            return (
             <div className="card" key={dep.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <strong>{dep.item} {dep.fixedType && <span style={{ color: '#8b5cf6', fontSize: '13px', marginLeft: '4px' }}>[{dep.fixedType}]</span>}</strong>
                 <span style={{ color: '#666', fontSize: '14px' }}>{dep.holder || dep.depositor} ({dep.bank})</span>
               </div>
-              <Row label="現有存款" value={`$${dep.amount.toLocaleString()}`} color="#10b981" isBold />
+              
+              <Row label={dep.fixedType === '零存整付' ? "每月存款" : "單筆存款"} value={`$${Number(dep.amount || 0).toLocaleString()}`} />
+              {dep.interestRate ? <Row label="年利率" value={`${dep.interestRate}%`} /> : null}
+              {termLabel ? <Row label="存續期間" value={termLabel} /> : null}
+
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed #eee' }}>
+                <Row label="預估總本金" value={`$${totalPrincipal.toLocaleString()}`} />
+                <Row label="預定到期利息" value={`+ $${expectedInterest.toLocaleString()}`} color="#f59e0b" />
+                <Row label="預估到期總本息" value={`$${(totalPrincipal + expectedInterest).toLocaleString()}`} color="#10b981" isBold />
+              </div>
+              
               <div className="card-actions">
-                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleEditFixed(dep.id)}>編輯</button>
+                <button style={{ padding: '4px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(dep)}>編輯</button>
                 <button style={{ padding: '4px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteFixed(dep.id)}>刪除</button>
               </div>
+              {dep.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{dep.updatedAt}</div>}
             </div>
-          ))}
+            );
+          })}
         </div>
       </Section>
+
+      {/* 編輯彈出視窗 */}
+      {editingAsset && <AssetModal editData={editingAsset} onClose={() => setEditingAsset(null)} />}
     </div>
   );
 }
