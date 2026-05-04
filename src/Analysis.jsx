@@ -14,9 +14,9 @@ const COLORS = [
 const renderCustomizedLabel = ({ x, y, cx, percent, value, name }) => {
   if (percent < 0.02) return null; // 佔比小於 2% 則不顯示標籤
   return (
-    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
+    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
       <tspan x={x} dy="-0.5em">{name} {(percent * 100).toFixed(0)}%</tspan>
-      <tspan x={x} dy="1.2em" fill="#666" fontSize={11} fontWeight="normal">${value.toLocaleString()}</tspan>
+      <tspan x={x} dy="1.2em" fill="#666" fontSize={10} fontWeight="normal">${value.toLocaleString()}</tspan>
     </text>
   );
 };
@@ -43,7 +43,7 @@ export default function Analysis() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(''); // '' 表示全年
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterTxType, setFilterTxType] = useState(''); // '' 表示所有收支
+  const [filterTxType, setFilterTxType] = useState('expense'); // 預設為支出
   const [filterPayer, setFilterPayer] = useState('');
 
   // 比較條件
@@ -51,11 +51,26 @@ export default function Analysis() {
   const [compYear, setCompYear] = useState(new Date().getFullYear() - 1);
   const [compMonth, setCompMonth] = useState(new Date().getMonth() + 1); // 有篩選主月份時才會出現
   const [compCategory, setCompCategory] = useState('');
-  const [compTxType, setCompTxType] = useState(''); // '' 表示所有收支
+  const [compTxType, setCompTxType] = useState('expense'); // 預設為支出
   const [compPayer, setCompPayer] = useState('');
 
   // 表格呈現條件
   const [compareCondition, setCompareCondition] = useState('expense_ratio'); // 'expense_ratio', 'income_expense'
+
+  // 重置篩選器
+  const handleResetFilters = () => {
+    setFilterYear(new Date().getFullYear());
+    setFilterMonth('');
+    setFilterTxType('expense');
+    setFilterCategory('');
+    setFilterPayer('');
+    setIsComparing(false);
+    setCompYear(new Date().getFullYear() - 1);
+    setCompMonth(new Date().getMonth() + 1);
+    setCompTxType('expense');
+    setCompCategory('');
+    setCompPayer('');
+  };
 
   // 即時監聽 Firebase 資料
   useEffect(() => {
@@ -177,13 +192,13 @@ export default function Analysis() {
   const formatYearlyLegend = (value, entry) => {
     const total = value.includes('比較') ? totalComp : totalPrimary;
     const percentage = total > 0 ? ((entry.payload.value / total) * 100).toFixed(1) : 0;
-    return `${value} (${percentage}%)`;
+    return <span style={{ fontSize: '12px', color: '#333' }}>{`${value} (${percentage}%)`}</span>; // 💡 在這裡調整 12px 大小
   };
 
   const totalAssets = dynamicAssetData.reduce((sum, d) => sum + d.value, 0);
   const formatAssetLegend = (value, entry) => {
     const percentage = totalAssets > 0 ? ((entry.payload.value / totalAssets) * 100).toFixed(1) : 0;
-    return `${value} (${percentage}%)`;
+    return <span style={{ fontSize: '12px', color: '#333' }}>{`${value} (${percentage}%)`}</span>; // 💡 在這裡調整 12px 大小
   };
 
   // 處理狀態明細比較表資料
@@ -253,6 +268,13 @@ export default function Analysis() {
   const cIncName = compTxType ? compTitle : `${compTitle} - 收入`;
   const cExpName = compTxType ? compTitle : `${compTitle} - 支出`;
 
+  // 財產明細資料
+  const assetTableData = dynamicAssetData.map(d => ({
+    name: d.name,
+    amount: d.value,
+    ratio: totalAssets > 0 ? ((d.value / totalAssets) * 100).toFixed(1) + '%' : '0%'
+  })).sort((a, b) => b.amount - a.amount);
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -260,63 +282,67 @@ export default function Analysis() {
       </div>
 
       {/* 共用統一篩選器 */}
-      <div className="card" style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 'bold', minWidth: '60px' }}>主條件:</span>
-          <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} style={selectStyle}>
-            {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
-          </select>
-          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value ? Number(e.target.value) : '')} style={selectStyle}>
-            <option value="">全年</option>
-            {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
-          </select>
-          <select value={filterTxType} onChange={e => setFilterTxType(e.target.value)} style={selectStyle}>
-            <option value="">所有收支</option>
-            <option value="income">收入</option>
-            <option value="expense">支出</option>
-          </select>
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={selectStyle}>
-            <option value="">所有類別</option>
-            {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filterPayer} onChange={e => setFilterPayer(e.target.value)} style={selectStyle}>
-            <option value="">所有付款人</option>
-            {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          
-          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', marginLeft: 'auto', fontWeight: 'bold', color: isComparing ? '#8b5cf6' : '#666' }}>
-            <input type="checkbox" checked={isComparing} onChange={e => setIsComparing(e.target.checked)} />
-            啟用比較
-          </label>
-        </div>
-
-        {isComparing && (
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed #ddd' }}>
-            <span style={{ fontWeight: 'bold', minWidth: '60px', color: '#8b5cf6' }}>比較條件:</span>
-            <select value={compYear} onChange={e => setCompYear(Number(e.target.value))} style={selectStyle}>
+      {tab === 'income_expense' && (
+        <div className="card" style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 'bold', minWidth: '60px' }}>主條件:</span>
+            <select value={filterYear} onChange={e => setFilterYear(Number(e.target.value))} style={selectStyle}>
               {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
             </select>
-            {filterMonth !== '' && (
-              <select value={compMonth} onChange={e => setCompMonth(Number(e.target.value))} style={selectStyle}>
-                {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
-              </select>
-            )}
-            <select value={compTxType} onChange={e => setCompTxType(e.target.value)} style={selectStyle}>
+            <select value={filterMonth} onChange={e => setFilterMonth(e.target.value ? Number(e.target.value) : '')} style={selectStyle}>
+              <option value="">全年</option>
+              {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
+            </select>
+            <select value={filterTxType} onChange={e => setFilterTxType(e.target.value)} style={selectStyle}>
               <option value="">所有收支</option>
               <option value="income">收入</option>
               <option value="expense">支出</option>
             </select>
-            <select value={compCategory} onChange={e => setCompCategory(e.target.value)} style={selectStyle}>
+            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} style={selectStyle}>
               <option value="">所有類別</option>
               {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            <select value={compPayer} onChange={e => setCompPayer(e.target.value)} style={selectStyle}>
+            <select value={filterPayer} onChange={e => setFilterPayer(e.target.value)} style={selectStyle}>
               <option value="">所有付款人</option>
               {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
+            
+            <button onClick={handleResetFilters} style={{ padding: '6px 12px', background: '#f3f4f6', color: '#4b5563', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}>清空</button>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', marginLeft: 'auto', fontWeight: 'bold', color: isComparing ? '#8b5cf6' : '#666' }}>
+              <input type="checkbox" checked={isComparing} onChange={e => setIsComparing(e.target.checked)} />
+              啟用比較
+            </label>
           </div>
-        )}
-      </div>
+
+          {isComparing && (
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginTop: '15px', paddingTop: '15px', borderTop: '1px dashed #ddd' }}>
+              <span style={{ fontWeight: 'bold', minWidth: '60px', color: '#8b5cf6' }}>比較條件:</span>
+              <select value={compYear} onChange={e => setCompYear(Number(e.target.value))} style={selectStyle}>
+                {availableYears.map(y => <option key={y} value={y}>{y} 年</option>)}
+              </select>
+              {filterMonth !== '' && (
+                <select value={compMonth} onChange={e => setCompMonth(Number(e.target.value))} style={selectStyle}>
+                  {Array.from({length: 12}, (_, i) => <option key={i+1} value={i+1}>{i+1} 月</option>)}
+                </select>
+              )}
+              <select value={compTxType} onChange={e => setCompTxType(e.target.value)} style={selectStyle}>
+                <option value="">所有收支</option>
+                <option value="income">收入</option>
+                <option value="expense">支出</option>
+              </select>
+              <select value={compCategory} onChange={e => setCompCategory(e.target.value)} style={selectStyle}>
+                <option value="">所有類別</option>
+                {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={compPayer} onChange={e => setCompPayer(e.target.value)} style={selectStyle}>
+                <option value="">所有付款人</option>
+                {allPayers.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
       
       <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '20px' }}>
         <button className={`tab-btn ${tab === 'income_expense' ? 'active' : ''}`} onClick={() => setTab('income_expense')}>收支比較</button>
@@ -338,8 +364,8 @@ export default function Analysis() {
               <button onClick={() => setChartType('pie')} style={{ padding: '4px 8px', background: chartType === 'pie' ? '#10b981' : '#f0f2f5', color: chartType === 'pie' ? '#fff' : '#666', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>圓餅圖</button>
             </div>
           </div>
-          <div style={{ width: '100%', minHeight: '450px' }}>
-          <ResponsiveContainer width="100%" height={450}>
+          <div style={{ width: '100%', minHeight: chartType === 'pie' ? '550px' : '450px' }}>
+          <ResponsiveContainer width="100%" height={chartType === 'pie' ? 550 : 450}>
             {chartType === 'bar' ? (
               <BarChart data={timelineData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -366,16 +392,16 @@ export default function Analysis() {
               </LineChart>
             ) : (
               <PieChart>
-                <Pie data={yearlySummaryData} cx={isComparing ? "25%" : "50%"} cy="50%" innerRadius={60} outerRadius={120} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
+                <Pie data={yearlySummaryData} cx={isComparing ? "25%" : "50%"} cy="45%" innerRadius={isComparing ? 45 : 60} outerRadius={isComparing ? 90 : 120} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
                   {yearlySummaryData.map((entry, index) => <Cell key={`cell-${index}`} fill={filterTxType ? COLORS[index % COLORS.length] : (entry.name.includes('收入') ? '#10b981' : '#ef4444')} />)}
                 </Pie>
                 {isComparing && (
-                  <Pie data={compSummaryData} cx="75%" cy="50%" innerRadius={60} outerRadius={120} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
+                  <Pie data={compSummaryData} cx="75%" cy="45%" innerRadius={45} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
                     {compSummaryData.map((entry, index) => <Cell key={`comp-cell-${index}`} fill={compTxType ? COLORS[(index + 5) % COLORS.length] : (entry.name.includes('收入') ? '#3b82f6' : '#f59e0b')} />)}
                   </Pie>
                 )}
                 <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name]} />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} formatter={formatYearlyLegend} />
+              {!isComparing && <Legend wrapperStyle={{ paddingTop: '20px' }} formatter={formatYearlyLegend} />}
               </PieChart>
             )}
           </ResponsiveContainer>
@@ -389,12 +415,12 @@ export default function Analysis() {
           {dynamicAssetData.length === 0 ? (
             <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>尚無財產紀錄</div>
           ) : (
-          <div style={{ width: '100%', minHeight: '450px' }}>
-          <ResponsiveContainer width="100%" height={450}>
+          <div style={{ width: '100%', minHeight: '550px' }}>
+          <ResponsiveContainer width="100%" height={550}>
             <PieChart>
               <Pie 
                 data={dynamicAssetData} 
-                cx="50%" cy="50%" 
+                cx="50%" cy="45%" 
                 innerRadius={60} outerRadius={120} 
                 paddingAngle={5} 
                 dataKey="value"
@@ -415,21 +441,23 @@ export default function Analysis() {
       {/* 狀態明細與比較表 */}
       <div className="card" style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>狀態明細與比較表</h3>
-          <select value={compareCondition} onChange={e => setCompareCondition(e.target.value)} style={selectStyle}>
-            <option value="expense_ratio">消費比率</option>
-            <option value="income_expense">收支比</option>
-            <option value="payer_ratio">付款人比率</option>
-          </select>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>{tab === 'income_expense' ? '狀態明細與比較表' : '財產明細'}</h3>
+          {tab === 'income_expense' && (
+            <select value={compareCondition} onChange={e => setCompareCondition(e.target.value)} style={selectStyle}>
+              <option value="expense_ratio">消費比率</option>
+              <option value="income_expense">收支比</option>
+              <option value="payer_ratio">付款人比率</option>
+            </select>
+          )}
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #ddd' }}>
               <th style={{ padding: '10px 5px', color: '#666' }}>項目</th>
-              <th style={{ padding: '10px 5px', color: '#666' }}>{isComparing ? '主條件金額' : '金額'}</th>
-              <th style={{ padding: '10px 5px', color: '#666' }}>{isComparing ? '主條件比例' : '比例'}</th>
-              {isComparing && (
+              <th style={{ padding: '10px 5px', color: '#666' }}>{tab === 'income_expense' && isComparing ? '主條件金額' : '金額'}</th>
+              <th style={{ padding: '10px 5px', color: '#666' }}>{tab === 'income_expense' && isComparing ? '主條件比例' : '比例'}</th>
+              {tab === 'income_expense' && isComparing && (
                 <>
                   <th style={{ padding: '10px 5px', color: '#8b5cf6' }}>比較金額</th>
                   <th style={{ padding: '10px 5px', color: '#8b5cf6' }}>比較比例</th>
@@ -438,24 +466,40 @@ export default function Analysis() {
             </tr>
           </thead>
           <tbody>
-            {tableData.length === 0 ? (
-              <tr>
-                <td colSpan={isComparing ? 5 : 3} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>尚無資料</td>
-              </tr>
-            ) : (
-              tableData.map((row, idx) => (
-                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '10px 5px', color: '#333' }}>{row.name}</td>
-                  <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#ef4444' : '#333', fontWeight: 'bold' }}>${row.pAmt.toLocaleString()}</td>
-                  <td style={{ padding: '10px 5px', color: '#666' }}>{row.pRat}</td>
-                  {isComparing && (
-                    <>
-                      <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#f59e0b' : '#3b82f6', fontWeight: 'bold' }}>{row.cAmt != null ? `$${row.cAmt.toLocaleString()}` : '-'}</td>
-                      <td style={{ padding: '10px 5px', color: '#9ca3af' }}>{row.cRat || '-'}</td>
-                    </>
-                  )}
+            {tab === 'income_expense' ? (
+              tableData.length === 0 ? (
+                <tr>
+                  <td colSpan={isComparing ? 5 : 3} style={{ textAlign: 'center', padding: '20px', color: '#999' }}>尚無資料</td>
                 </tr>
-              ))
+              ) : (
+                tableData.map((row, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '10px 5px', color: '#333' }}>{row.name}</td>
+                    <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#ef4444' : '#333', fontWeight: 'bold' }}>${row.pAmt.toLocaleString()}</td>
+                    <td style={{ padding: '10px 5px', color: '#666' }}>{row.pRat}</td>
+                    {isComparing && (
+                      <>
+                        <td style={{ padding: '10px 5px', color: row.name.includes('支出') ? '#f59e0b' : '#3b82f6', fontWeight: 'bold' }}>{row.cAmt != null ? `$${row.cAmt.toLocaleString()}` : '-'}</td>
+                        <td style={{ padding: '10px 5px', color: '#9ca3af' }}>{row.cRat || '-'}</td>
+                      </>
+                    )}
+                  </tr>
+                ))
+              )
+            ) : (
+              assetTableData.length === 0 ? (
+                <tr>
+                  <td colSpan="3" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>尚無資料</td>
+                </tr>
+              ) : (
+                assetTableData.map((row, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '10px 5px', color: '#333' }}>{row.name}</td>
+                    <td style={{ padding: '10px 5px', color: '#10b981', fontWeight: 'bold' }}>${row.amount.toLocaleString()}</td>
+                    <td style={{ padding: '10px 5px', color: '#666' }}>{row.ratio}</td>
+                  </tr>
+                ))
+              )
             )}
           </tbody>
         </table>

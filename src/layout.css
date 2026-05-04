@@ -5,8 +5,13 @@ body, button, input, select, textarea {
 }
 
 /* 強制讓圖表文字套用微軟正黑體 */
-.recharts-text, .recharts-legend-item-text {
+.recharts-text, .recharts-legend-item-text, .recharts-tooltip-wrapper {
   font-family: "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* 統一將圖表的軸線文字、圖例與提示框字體縮小為 12px */
+.recharts-cartesian-axis-tick-value, .recharts-legend-item-text, .recharts-tooltip-wrapper {
+  font-size: 12px !important;
 }
 
 #root {

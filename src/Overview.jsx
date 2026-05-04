@@ -15,9 +15,9 @@ const COLORS = [
 const renderCustomizedLabel = ({ x, y, cx, percent, value, name }) => {
   if (percent < 0.02) return null; // 佔比小於 2% 則不顯示標籤
   return (
-    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
+    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
       <tspan x={x} dy="-0.5em">{name} {(percent * 100).toFixed(0)}%</tspan>
-      <tspan x={x} dy="1.2em" fill="#666" fontSize={11} fontWeight="normal">${value.toLocaleString()}</tspan>
+      <tspan x={x} dy="1.2em" fill="#666" fontSize={10} fontWeight="normal">${value.toLocaleString()}</tspan>
     </text>
   );
 };
@@ -90,7 +90,7 @@ export default function Overview() {
   const totalPieValue = pieData.reduce((sum, item) => sum + item.value, 0);
   const renderLegendText = (value, entry) => {
     const percentage = totalPieValue > 0 ? ((entry.payload.value / totalPieValue) * 100).toFixed(1) : 0;
-    return `${value} (${percentage}%)`;
+    return <span style={{ fontSize: '12px', color: '#333' }}>{`${value} (${percentage}%)`}</span>; // 💡 在這裡調整 12px 大小
   };
 
   return (
