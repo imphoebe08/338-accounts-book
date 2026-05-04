@@ -338,8 +338,8 @@ export default function Analysis() {
               <button onClick={() => setChartType('pie')} style={{ padding: '4px 8px', background: chartType === 'pie' ? '#10b981' : '#f0f2f5', color: chartType === 'pie' ? '#fff' : '#666', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>圓餅圖</button>
             </div>
           </div>
-          <div style={{ height: '450px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', minHeight: '450px' }}>
+          <ResponsiveContainer width="100%" height={450}>
             {chartType === 'bar' ? (
               <BarChart data={timelineData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -389,8 +389,8 @@ export default function Analysis() {
           {dynamicAssetData.length === 0 ? (
             <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>尚無財產紀錄</div>
           ) : (
-          <div style={{ height: '450px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', minHeight: '450px' }}>
+          <ResponsiveContainer width="100%" height={450}>
             <PieChart>
               <Pie 
                 data={dynamicAssetData} 

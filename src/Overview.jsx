@@ -136,8 +136,8 @@ export default function Overview() {
         {pieData.length === 0 ? (
           <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>本月尚無支出紀錄</div>
         ) : (
-          <div style={{ height: '450px', width: '100%' }}>
-          <ResponsiveContainer width="100%" height="100%">
+          <div style={{ width: '100%', minHeight: '450px' }}>
+          <ResponsiveContainer width="100%" height={450}>
             <PieChart>
               <Pie 
                 data={pieData} 
