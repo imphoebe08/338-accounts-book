@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import TransactionModal from './TransactionModal';
 
@@ -32,9 +32,8 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   );
 };
 
-export default function Overview() {
+export default function Overview({ transactions }) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [transactions, setTransactions] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingTx, setEditingTx] = useState(null);
   const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
@@ -66,19 +65,6 @@ export default function Overview() {
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
-
-  // 監聽 Firebase 資料庫變化
-  useEffect(() => {
-    // 建立查詢：依據日期由新到舊排序
-    const q = query(collection(db, "transactions"), orderBy("date", "desc"));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setTransactions(data);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   // 刪除紀錄
   const handleDelete = async (id) => {

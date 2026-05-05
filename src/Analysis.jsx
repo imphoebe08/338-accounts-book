@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from './firebase';
 
 const COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', 
@@ -43,11 +41,9 @@ const generateTitle = (y, m, txT, cat, payer) => {
   return title;
 };
 
-export default function Analysis() {
+export default function Analysis({ transactions, assets }) {
   const [tab, setTab] = useState('income_expense');
   const [chartType, setChartType] = useState('bar'); // 'bar', 'line', 'pie'
-  const [transactions, setTransactions] = useState([]);
-  const [assets, setAssets] = useState([]);
 
   // 共用主條件
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
@@ -82,17 +78,6 @@ export default function Analysis() {
     setCompCategory('');
     setCompPayer('');
   };
-
-  // 即時監聽 Firebase 資料
-  useEffect(() => {
-    const unsubTx = onSnapshot(collection(db, "transactions"), (snapshot) => {
-      setTransactions(snapshot.docs.map(doc => doc.data()));
-    });
-    const unsubAssets = onSnapshot(collection(db, "assets"), (snapshot) => {
-      setAssets(snapshot.docs.map(doc => doc.data()));
-    });
-    return () => { unsubTx(); unsubAssets(); };
-  }, []);
 
   // 動態取得所有年份
   const availableYears = useMemo(() => {

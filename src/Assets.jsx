@@ -1,25 +1,15 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import AssetModal from './AssetModal';
 
-export default function Assets() {
-  const [stocks, setStocks] = useState([]);
-  const [demandList, setDemandList] = useState([]);
-  const [fixedList, setFixedList] = useState([]);
+export default function Assets({ assets }) {
+  const stocks = assets.filter(d => d.type === 'stock');
+  const demandList = assets.filter(d => d.type === 'demand');
+  const fixedList = assets.filter(d => d.type === 'fixed');
+
   const [isFetching, setIsFetching] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
-
-  // 真實從 Firebase 取回所有財產
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'assets'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setStocks(data.filter(d => d.type === 'stock'));
-      setDemandList(data.filter(d => d.type === 'demand'));
-      setFixedList(data.filter(d => d.type === 'fixed'));
-    });
-    return () => unsub();
-  }, []);
 
   // 真實串接 Yahoo Finance API 更新收盤價
   const handleFetchPrices = async () => {
