@@ -11,12 +11,22 @@ const COLORS = [
 ];
 
 // 客製化圓餅圖標籤，讓文字換行並過濾極小數值避免重疊
-const renderCustomizedLabel = ({ x, y, cx, percent, value, name }) => {
-  if (percent < 0.02) return null; // 佔比小於 2% 則不顯示標籤
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, payload }) => {
+  if (!percent || percent < 0.05) return null; // 佔比小於 5% 則不顯示標籤
+  
+  const RADIAN = Math.PI / 180;
+  // 將半徑設定在圓餅圖外圍，搭配 labelLine 指示線
+  const radius = outerRadius * 1.2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  // 根據標籤在左側或右側決定對齊方向
+  const textAnchor = x > cx ? 'start' : 'end';
+
   return (
-    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
+    <text x={x} y={y} fill="#5C5446" textAnchor={textAnchor} dominantBaseline="central" fontSize={12} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
       <tspan x={x} dy="-0.5em">{name} {(percent * 100).toFixed(0)}%</tspan>
-      <tspan x={x} dy="1.2em" fill="#666" fontSize={10} fontWeight="normal">${value.toLocaleString()}</tspan>
+      <tspan x={x} dy="1.2em" fontSize={11} fill="#888">${value.toLocaleString()}</tspan>
     </text>
   );
 };
@@ -43,7 +53,7 @@ export default function Analysis() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
   const [filterMonth, setFilterMonth] = useState(''); // '' 表示全年
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterTxType, setFilterTxType] = useState('expense'); // 預設為支出
+  const [filterTxType, setFilterTxType] = useState(''); // 預設為所有收支
   const [filterPayer, setFilterPayer] = useState('');
 
   // 比較條件
@@ -51,9 +61,10 @@ export default function Analysis() {
   const [compYear, setCompYear] = useState(new Date().getFullYear() - 1);
   const [compMonth, setCompMonth] = useState(new Date().getMonth() + 1); // 有篩選主月份時才會出現
   const [compCategory, setCompCategory] = useState('');
-  const [compTxType, setCompTxType] = useState('expense'); // 預設為支出
+  const [compTxType, setCompTxType] = useState(''); // 預設為所有收支
   const [compPayer, setCompPayer] = useState('');
 
+  const [showLegend, setShowLegend] = useState(false);
   // 表格呈現條件
   const [compareCondition, setCompareCondition] = useState('expense_ratio'); // 'expense_ratio', 'income_expense'
 
@@ -61,13 +72,13 @@ export default function Analysis() {
   const handleResetFilters = () => {
     setFilterYear(new Date().getFullYear());
     setFilterMonth('');
-    setFilterTxType('expense');
+    setFilterTxType('');
     setFilterCategory('');
     setFilterPayer('');
     setIsComparing(false);
     setCompYear(new Date().getFullYear() - 1);
     setCompMonth(new Date().getMonth() + 1);
-    setCompTxType('expense');
+    setCompTxType('');
     setCompCategory('');
     setCompPayer('');
   };
@@ -153,48 +164,53 @@ export default function Analysis() {
   // 供圓餅圖使用 (Yearly/Monthly Summary)
   const { yearlySummaryData, compSummaryData } = useMemo(() => {
     let yData = [];
-    if (filterTxType === 'income' || filterTxType === 'expense') {
-      const map = {};
-      primaryTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
-      yData = Object.entries(map).map(([name, value]) => ({ name, value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
-    } else {
-      yData = [
-        { name: '收入', value: primaryTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
-        { name: '支出', value: primaryTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
-      ].filter(d => d.value > 0);
-    }
+    const yMap = {};
+    primaryTx.forEach(t => {
+      const cat = t.category || '未分類';
+      if (!yMap[cat]) yMap[cat] = { value: 0, items: new Set() };
+      yMap[cat].value += t.amount;
+      if (t.item) yMap[cat].items.add(t.item);
+    });
+    yData = Object.entries(yMap).map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
 
     let cData = [];
     if (isComparing) {
-      if (compTxType === 'income' || compTxType === 'expense') {
-        const map = {};
-        compTx.forEach(t => map[t.category || '未分類'] = (map[t.category || '未分類'] || 0) + t.amount);
-        cData = Object.entries(map).map(([name, value]) => ({ name: name + '(比較)', value })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
-      } else {
-        cData = [
-          { name: '收入(比較)', value: compTx.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0) },
-          { name: '支出(比較)', value: compTx.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) }
-        ].filter(d => d.value > 0);
-      }
+      const cMap = {};
+      compTx.forEach(t => {
+        const cat = t.category || '未分類';
+        if (!cMap[cat]) cMap[cat] = { value: 0, items: new Set() };
+        cMap[cat].value += t.amount;
+        if (t.item) cMap[cat].items.add(t.item);
+      });
+      cData = Object.entries(cMap).map(([name, data]) => ({ name: name + '(比較)', value: data.value, items: Array.from(data.items) })).filter(d => d.value > 0).sort((a,b) => b.value - a.value);
     }
     return { yearlySummaryData: yData, compSummaryData: cData };
-  }, [filterTxType, primaryTx, isComparing, compTxType, compTx]);
+  }, [primaryTx, isComparing, compTx]);
 
   // 動態計算財產佔比
   const dynamicAssetData = useMemo(() => {
-    const assetDataMap = { '股票': 0, '活期存款': 0, '定期存款': 0 };
+    const assetDataMap = { 
+      '股票': { value: 0, items: new Set() }, 
+      '活期存款': { value: 0, items: new Set() }, 
+      '定期存款': { value: 0, items: new Set() } 
+    };
     assets.forEach(asset => {
-      if (asset.type === 'stock') assetDataMap['股票'] += (Number(asset.shares) * Number(asset.cost)) || 0;
-      else if (asset.type === 'demand') assetDataMap['活期存款'] += Number(asset.amount) || 0;
-      else if (asset.type === 'fixed') {
+      if (asset.type === 'stock') {
+        assetDataMap['股票'].value += (Number(asset.shares) * Number(asset.cost)) || 0;
+        if (asset.item) assetDataMap['股票'].items.add(asset.item);
+      } else if (asset.type === 'demand') {
+        assetDataMap['活期存款'].value += Number(asset.amount) || 0;
+        if (asset.item) assetDataMap['活期存款'].items.add(asset.item);
+      } else if (asset.type === 'fixed') {
         let principal = Number(asset.amount) || 0;
         if (asset.fixedType === '零存整付' && asset.durationMonths) {
           principal = principal * Number(asset.durationMonths);
         }
-        assetDataMap['定期存款'] += principal;
+        assetDataMap['定期存款'].value += principal;
+        if (asset.item) assetDataMap['定期存款'].items.add(asset.item);
       }
     });
-    return Object.entries(assetDataMap).filter(([_, val]) => val > 0).map(([name, value]) => ({ name, value }));
+    return Object.entries(assetDataMap).filter(([_, data]) => data.value > 0).map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) }));
   }, [assets]);
 
   // 計算圖例比例 (分開處理主條件與比較條件)
@@ -377,47 +393,102 @@ export default function Analysis() {
               <button onClick={() => setChartType('pie')} style={{ padding: '6px 14px', background: chartType === 'pie' ? '#D5B77A' : '#EAE3D2', color: chartType === 'pie' ? '#fff' : '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '12px' }}>圓餅圖</button>
             </div>
           </div>
-          <div style={{ width: '100%', minHeight: chartType === 'pie' ? '550px' : '450px' }}>
-          <ResponsiveContainer width="100%" height={chartType === 'pie' ? 550 : 450}>
+          
+          <div style={{ width: '100%', minHeight: chartType === 'pie' ? 'auto' : '450px' }}>
             {chartType === 'bar' ? (
-              <BarChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip cursor={{fill: '#f4f4f4'}} formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
-                <Legend />
-                {(!filterTxType || filterTxType === 'income') && <Bar dataKey="主條件_收入" name={pIncName} fill="#10b981" radius={[8, 8, 0, 0]} />}
-                {(!filterTxType || filterTxType === 'expense') && <Bar dataKey="主條件_支出" name={pExpName} fill="#ef4444" radius={[8, 8, 0, 0]} />}
-                {isComparing && (!compTxType || compTxType === 'income') && <Bar dataKey="比較條件_收入" name={cIncName} fill="#3b82f6" radius={[8, 8, 0, 0]} />}
-                {isComparing && (!compTxType || compTxType === 'expense') && <Bar dataKey="比較條件_支出" name={cExpName} fill="#f59e0b" radius={[8, 8, 0, 0]} />}
-              </BarChart>
+              <ResponsiveContainer width="100%" height={450}>
+                <BarChart data={timelineData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip cursor={{fill: '#f4f4f4'}} formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
+                  <Legend />
+                  {(!filterTxType || filterTxType === 'income') && <Bar dataKey="主條件_收入" name={pIncName} fill="#10b981" radius={[8, 8, 0, 0]} />}
+                  {(!filterTxType || filterTxType === 'expense') && <Bar dataKey="主條件_支出" name={pExpName} fill="#ef4444" radius={[8, 8, 0, 0]} />}
+                  {isComparing && (!compTxType || compTxType === 'income') && <Bar dataKey="比較條件_收入" name={cIncName} fill="#3b82f6" radius={[8, 8, 0, 0]} />}
+                  {isComparing && (!compTxType || compTxType === 'expense') && <Bar dataKey="比較條件_支出" name={cExpName} fill="#f59e0b" radius={[8, 8, 0, 0]} />}
+                </BarChart>
+              </ResponsiveContainer>
             ) : chartType === 'line' ? (
-              <LineChart data={timelineData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
-                <Legend />
-                {(!filterTxType || filterTxType === 'income') && <Line type="monotone" dataKey="主條件_收入" name={pIncName} stroke="#10b981" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
-                {(!filterTxType || filterTxType === 'expense') && <Line type="monotone" dataKey="主條件_支出" name={pExpName} stroke="#ef4444" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
-                {isComparing && (!compTxType || compTxType === 'income') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_收入" name={cIncName} stroke="#3b82f6" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
-                {isComparing && (!compTxType || compTxType === 'expense') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_支出" name={cExpName} stroke="#f59e0b" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
-              </LineChart>
+              <ResponsiveContainer width="100%" height={450}>
+                <LineChart data={timelineData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('_', '-')]} />
+                  <Legend />
+                  {(!filterTxType || filterTxType === 'income') && <Line type="monotone" dataKey="主條件_收入" name={pIncName} stroke="#10b981" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                  {(!filterTxType || filterTxType === 'expense') && <Line type="monotone" dataKey="主條件_支出" name={pExpName} stroke="#ef4444" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                  {isComparing && (!compTxType || compTxType === 'income') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_收入" name={cIncName} stroke="#3b82f6" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                  {isComparing && (!compTxType || compTxType === 'expense') && <Line type="monotone" strokeDasharray="5 5" dataKey="比較條件_支出" name={cExpName} stroke="#f59e0b" strokeWidth={4} dot={{ r: 5 }} activeDot={{ r: 7 }} />}
+                </LineChart>
+              </ResponsiveContainer>
             ) : (
-              <PieChart>
-                <Pie data={yearlySummaryData} cx={isComparing ? "25%" : "50%"} cy="45%" innerRadius={isComparing ? 45 : 60} outerRadius={isComparing ? 90 : 120} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
-                  {yearlySummaryData.map((entry, index) => <Cell key={`cell-${index}`} fill={filterTxType ? COLORS[index % COLORS.length] : (entry.name.includes('收入') ? '#10b981' : '#ef4444')} />)}
-                </Pie>
-                {isComparing && (
-                  <Pie data={compSummaryData} cx="75%" cy="45%" innerRadius={45} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
-                    {compSummaryData.map((entry, index) => <Cell key={`comp-cell-${index}`} fill={compTxType ? COLORS[(index + 5) % COLORS.length] : (entry.name.includes('收入') ? '#3b82f6' : '#f59e0b')} />)}
-                  </Pie>
-                )}
-                <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name]} />
-              {!isComparing && <Legend wrapperStyle={{ paddingTop: '20px' }} formatter={formatYearlyLegend} />}
-              </PieChart>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: isComparing ? 'column' : 'row', gap: '20px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, position: 'relative', height: '320px', minWidth: '280px' }}>
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                      <div style={{ fontSize: '12px', color: '#999' }}>主條件</div>
+                      <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${totalPrimary.toLocaleString()}</div>
+                    </div>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={yearlySummaryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
+                          {yearlySummaryData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {isComparing && (
+                    <div style={{ flex: 1, position: 'relative', height: '320px', minWidth: '280px' }}>
+                      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                        <div style={{ fontSize: '12px', color: '#999' }}>比較條件</div>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${totalComp.toLocaleString()}</div>
+                      </div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={compSummaryData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" labelLine={true} label={renderCustomizedLabel}>
+                            {compSummaryData.map((entry, index) => <Cell key={`comp-cell-${index}`} fill={COLORS[(index + 5) % COLORS.length]} />)}
+                          </Pie>
+                          <Tooltip formatter={(value, name) => [`$${value.toLocaleString()}`, name.replace('(比較)', '')]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+                {/* 把展開和隱藏資訊獨立成一個 Div */}
+                <div style={{ marginTop: '10px' }}>
+                  <button onClick={() => setShowLegend(!showLegend)} style={{ width: '100%', padding: '10px', background: '#F8F6F0', color: '#D5B77A', border: '1px solid #EAE3D2', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+                    {showLegend ? '隱藏詳細資訊 ▲' : '展開詳細資訊 ▼'}
+                  </button>
+                  {showLegend && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '15px' }}>
+                      {yearlySummaryData.map((entry, index) => {
+                        const percentage = totalPrimary > 0 ? ((entry.value / totalPrimary) * 100).toFixed(1) : 0;
+                        const color = COLORS[index % COLORS.length];
+                        return (
+                          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px', background: '#fff', border: '1px solid #eee', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }}></div><span style={{ color: '#333' }}>{entry.name}</span></div>
+                            <div style={{ color: '#666', fontWeight: '500' }}>{percentage}%</div>
+                          </div>
+                        );
+                      })}
+                      {isComparing && compSummaryData.map((entry, index) => {
+                        const percentage = totalComp > 0 ? ((entry.value / totalComp) * 100).toFixed(1) : 0;
+                        const color = COLORS[(index + 5) % COLORS.length];
+                        return (
+                          <div key={`comp-${index}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px', padding: '8px', background: '#fff', border: '1px dashed #eee', borderRadius: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><div style={{ width: '12px', height: '12px', borderRadius: '50%', background: color }}></div><span style={{ color: '#333' }}>{entry.name}</span></div>
+                            <div style={{ color: '#666', fontWeight: '500' }}>{percentage}%</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-          </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -434,7 +505,7 @@ export default function Analysis() {
               <Pie 
                 data={dynamicAssetData} 
                 cx="50%" cy="45%" 
-                innerRadius={60} outerRadius={120} 
+                innerRadius={80} outerRadius={120} 
                 paddingAngle={5} 
                 dataKey="value"
                 labelLine={true}
@@ -515,6 +586,29 @@ export default function Analysis() {
               )
             )}
           </tbody>
+          {/* 總計列 */}
+          <tfoot>
+            {tab === 'income_expense' && compareCondition !== 'income_expense' && tableData.length > 0 && (
+              <tr style={{ borderTop: '2px solid #ddd', background: '#F8F6F0', fontWeight: 'bold' }}>
+                <td style={{ padding: '10px 5px', color: '#333' }}>總計</td>
+                <td style={{ padding: '10px 5px', color: '#333' }}>${tableData.reduce((sum, row) => sum + (row.pAmt || 0), 0).toLocaleString()}</td>
+                <td style={{ padding: '10px 5px', color: '#666' }}>100%</td>
+                {isComparing && (
+                  <>
+                    <td style={{ padding: '10px 5px', color: '#333' }}>${tableData.reduce((sum, row) => sum + (row.cAmt || 0), 0).toLocaleString()}</td>
+                    <td style={{ padding: '10px 5px', color: '#666' }}>100%</td>
+                  </>
+                )}
+              </tr>
+            )}
+            {tab === 'assets' && assetTableData.length > 0 && (
+              <tr style={{ borderTop: '2px solid #ddd', background: '#F8F6F0', fontWeight: 'bold' }}>
+                <td style={{ padding: '10px 5px', color: '#333' }}>總計</td>
+                <td style={{ padding: '10px 5px', color: '#10b981' }}>${assetTableData.reduce((sum, row) => sum + (row.amount || 0), 0).toLocaleString()}</td>
+                <td style={{ padding: '10px 5px', color: '#666' }}>100%</td>
+              </tr>
+            )}
+          </tfoot>
         </table>
       </div>
     </div>

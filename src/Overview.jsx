@@ -12,12 +12,22 @@ const COLORS = [
 ];
 
 // 客製化圓餅圖標籤，讓文字換行並過濾極小數值避免重疊
-const renderCustomizedLabel = ({ x, y, cx, percent, value, name }) => {
-  if (percent < 0.02) return null; // 佔比小於 2% 則不顯示標籤
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, value, name, payload }) => {
+  if (!percent || percent < 0.05) return null; // 佔比小於 5% 則不顯示標籤
+  
+  const RADIAN = Math.PI / 180;
+  // 將半徑設定在圓餅圖外圍，搭配 labelLine 指示線
+  const radius = outerRadius * 1.2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  // 根據標籤在左側或右側決定對齊方向
+  const textAnchor = x > cx ? 'start' : 'end';
+
   return (
-    <text x={x} y={y} fill="#333" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={11} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
+    <text x={x} y={y} fill="#5C5446" textAnchor={textAnchor} dominantBaseline="central" fontSize={12} fontWeight="bold" fontFamily="Microsoft JhengHei, sans-serif">
       <tspan x={x} dy="-0.5em">{name} {(percent * 100).toFixed(0)}%</tspan>
-      <tspan x={x} dy="1.2em" fill="#666" fontSize={10} fontWeight="normal">${value.toLocaleString()}</tspan>
+      <tspan x={x} dy="1.2em" fontSize={11} fill="#888">${value.toLocaleString()}</tspan>
     </text>
   );
 };
@@ -29,6 +39,12 @@ export default function Overview() {
   const [editingTx, setEditingTx] = useState(null);
   const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
   const [showLegend, setShowLegend] = useState(false);
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  useEffect(() => {
+    setPickerYear(currentDate.getFullYear());
+  }, [currentDate]);
 
   const handlePrev = () => {
     if (viewMode === 'year') {
@@ -86,16 +102,20 @@ export default function Overview() {
   }), [filteredTransactions]);
 
   // 動態計算當月支出的圓餅圖資料
-  const pieData = useMemo(() => Object.entries(
-    filteredTransactions
+  const pieData = useMemo(() => {
+    const grouped = filteredTransactions
       .filter(t => t.type === 'expense')
       .reduce((acc, tx) => {
-        acc[tx.category] = (acc[tx.category] || 0) + tx.amount;
+        if (!acc[tx.category]) acc[tx.category] = { value: 0, items: new Set() };
+        acc[tx.category].value += tx.amount;
+        if (tx.item) acc[tx.category].items.add(tx.item);
         return acc;
-      }, {})
-  )
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value), [filteredTransactions]); // 依金額由大到小排序
+      }, {});
+      
+    return Object.entries(grouped)
+      .map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTransactions]); // 依金額由大到小排序
 
   // 根據點擊的圓餅圖色塊篩選顯示的項目
   const displayedTransactions = selectedCategory 
@@ -114,30 +134,51 @@ export default function Overview() {
       
       {/* 頁籤切換 */}
       <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '20px' }}>
-        <button className={`tab-btn ${viewMode === 'month' ? 'active' : ''}`} onClick={() => setViewMode('month')}>本月</button>
-        <button className={`tab-btn ${viewMode === 'year' ? 'active' : ''}`} onClick={() => setViewMode('year')}>本年度</button>
+        <button className={`tab-btn ${viewMode === 'month' ? 'active' : ''}`} onClick={() => { setViewMode('month'); setCurrentDate(new Date()); setSelectedCategory(null); }}>本月</button>
+        <button className={`tab-btn ${viewMode === 'year' ? 'active' : ''}`} onClick={() => { setViewMode('year'); setCurrentDate(new Date()); setSelectedCategory(null); }}>本年度</button>
       </div>
 
       {/* 年月選擇器 */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
+      <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginBottom: '20px' }}>
         <button onClick={handlePrev} style={{ padding: '10px 20px', background: '#fff', color: '#5C5446', border: 'none', borderRadius: '24px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>◀</button>
-        {viewMode === 'month' ? (
-          <input 
-            type="month" 
-            value={`${year}-${String(month).padStart(2, '0')}`}
-            onClick={(e) => e.target.showPicker && e.target.showPicker()}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              setSelectedCategory(null);
-              const [y, m] = e.target.value.split('-');
-              setCurrentDate(new Date(y, m - 1, 1));
-            }}
-            style={{ border: 'none', fontSize: '20px', fontWeight: 'bold', color: '#333', background: 'transparent', textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit' }}
-          />
-        ) : (
-          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>{year} 年</span>
-        )}
+        
+        <div 
+          onClick={() => viewMode === 'month' && setShowDatePicker(!showDatePicker)}
+          style={{ fontSize: '20px', fontWeight: 'bold', color: '#333', cursor: viewMode === 'month' ? 'pointer' : 'default', padding: '8px 16px', background: 'transparent', borderRadius: '12px', minWidth: '120px', textAlign: 'center' }}
+        >
+          {viewMode === 'month' ? `${year} 年 ${month} 月` : `${year} 年`}
+        </div>
+        
         <button onClick={handleNext} style={{ padding: '10px 20px', background: '#fff', color: '#5C5446', border: 'none', borderRadius: '24px', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>▶</button>
+
+        {/* 白色 iOS 風格年月選擇器 */}
+        {showDatePicker && viewMode === 'month' && (
+          <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', width: '280px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 100, padding: '16px', border: '1px solid #EAE3D2', marginTop: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <button onClick={() => setPickerYear(pickerYear - 1)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#5C5446', padding: '5px' }}>◀</button>
+              <div style={{ fontWeight: 'bold', color: '#333', fontSize: '16px' }}>{pickerYear} 年</div>
+              <button onClick={() => setPickerYear(pickerYear + 1)} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#5C5446', padding: '5px' }}>▶</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
+              {Array.from({ length: 12 }).map((_, i) => {
+                const isSelected = pickerYear === year && (i + 1) === month;
+                return (
+                  <div 
+                    key={i} 
+                    onClick={() => { 
+                      setCurrentDate(new Date(pickerYear, i, 1)); 
+                      setSelectedCategory(null);
+                      setShowDatePicker(false); 
+                    }} 
+                    style={{ padding: '12px 0', textAlign: 'center', cursor: 'pointer', background: isSelected ? '#D5B77A' : '#F8F6F0', color: isSelected ? '#fff' : '#5C5446', borderRadius: '12px', fontWeight: isSelected ? 'bold' : 'normal', fontSize: '14px' }}
+                  >
+                    {i + 1}月
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 本月收支摘要 */}
@@ -163,22 +204,23 @@ export default function Overview() {
           <div style={{ display: 'flex', height: '300px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無支出紀錄</div>
         ) : (
           <>
-            <div style={{ position: 'relative', width: '100%', minHeight: '300px' }}>
+            <div style={{ position: 'relative', width: '100%', height: '320px' }}>
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
                 <div style={{ fontSize: '12px', color: '#999' }}>結餘</div>
                 <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${(totalIncome - totalExpense).toLocaleString()}</div>
               </div>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie 
                     data={pieData} 
                     cx="50%" cy="50%" 
-                    innerRadius={75} outerRadius={115} 
+                    innerRadius={60} outerRadius={90} 
                     paddingAngle={5} 
                     dataKey="value"
-                    labelLine={false}
+                    labelLine={true}
                     onClick={(entry) => setSelectedCategory(selectedCategory === entry.name ? null : entry.name)}
                     style={{ cursor: 'pointer' }}
+                    label={renderCustomizedLabel}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} opacity={selectedCategory === null || selectedCategory === entry.name ? 1 : 0.3} />
@@ -199,7 +241,7 @@ export default function Overview() {
               </button>
               
               {showLegend && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px', marginTop: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '15px' }}>
                   {pieData.map((entry, index) => {
                     const percentage = totalPieValue > 0 ? ((entry.value / totalPieValue) * 100).toFixed(1) : 0;
                     return (

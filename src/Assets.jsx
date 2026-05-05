@@ -32,24 +32,29 @@ export default function Assets() {
         
         const symbol = match[0];
         const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.TW?interval=1d`;
-        // 改用 allorigins 的 /get 端點，由伺服器代理解壓縮並以字串包裝，避免二進位亂碼解析錯誤
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+        
+        let price = null;
         
         try {
-          const res = await fetch(proxyUrl);
-          const wrapper = await res.json();
-          
-          if (wrapper.contents) {
-            const data = JSON.parse(wrapper.contents);
-            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            const today = new Date().toISOString().split('T')[0];
-            if (price) {
-              await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
-              successCount++;
-            }
+          // 嘗試來源一: corsproxy.io (不帶多餘 wrapper，較穩定)
+          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+          const data = await res.json();
+          price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        } catch (e) {
+          // 嘗試來源二: allorigins raw 端點備援
+          try {
+            const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+            const data2 = await res2.json();
+            price = data2?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          } catch (err2) {
+            console.error(`抓取 ${symbol} 失敗:`, err2);
           }
-        } catch (err) {
-          console.error(`抓取 ${symbol} 失敗:`, err);
+        }
+
+        if (price) {
+          const today = new Date().toISOString().split('T')[0];
+          await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
+          successCount++;
         }
       }));
       alert(`股價更新完成！(成功更新 ${successCount} 筆)\n（註：若仍有失敗項目，可能是 Proxy 不穩定）`);

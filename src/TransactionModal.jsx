@@ -26,12 +26,19 @@ export default function TransactionModal({ onClose, editData }) {
   const [type, setType] = useState(editData?.type || 'expense');
   const [amount, setAmount] = useState(editData ? String(editData.amount) : '0');
   const [item, setItem] = useState(editData?.item || '');
+  const [date, setDate] = useState(editData?.date || new Date().toISOString().split('T')[0]);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const categories = type === 'expense' ? configData.expenseCats : configData.incomeCats;
   const shortcuts = type === 'expense' ? configData.expenseShorts : configData.incomeShorts;
   const availablePayers = configData.payers || PAYERS;
   const [category, setCategory] = useState(editData?.category || EXPENSE_CATEGORIES[0]);
   const [payer, setPayer] = useState(editData?.payer || availablePayers[0] || '');
+
+  useEffect(() => {
+    setCalendarMonth(new Date(date));
+  }, [date]);
 
   // 處理計算機按鍵點擊
   const handleKeyClick = (key) => {
@@ -40,13 +47,29 @@ export default function TransactionModal({ onClose, editData }) {
     } else if (key === 'C') {
       setAmount('0');
     } else if (key === '今天') {
-      // 未來可擴充為日期選擇器
+      setDate(new Date().toISOString().split('T')[0]);
     } else if (key === '完成') {
       handleSubmit();
     } else {
       setAmount(amount === '0' && key !== '+' && key !== '-' ? key : amount + key);
     }
   };
+
+  // 處理日期左右切換 (使用 UTC 避免時區跨日問題)
+  const handlePrevDay = () => {
+    const d = new Date(date);
+    d.setUTCDate(d.getUTCDate() - 1);
+    setDate(d.toISOString().split('T')[0]);
+    setCalendarMonth(new Date(d));
+  };
+  const handleNextDay = () => {
+    const d = new Date(date);
+    d.setUTCDate(d.getUTCDate() + 1);
+    setDate(d.toISOString().split('T')[0]);
+    setCalendarMonth(new Date(d));
+  };
+  const handlePrevMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1));
+  const handleNextMonth = () => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
 
   const keys = ['7', '8', '9', '今天', '4', '5', '6', '+', '1', '2', '3', '-', 'C', '0', '⌫', '完成'];
 
@@ -74,6 +97,7 @@ export default function TransactionModal({ onClose, editData }) {
           category,
           payer,
           amount: finalAmount,
+          date: date,
         });
       } else {
         await addDoc(collection(db, 'transactions'), {
@@ -82,7 +106,7 @@ export default function TransactionModal({ onClose, editData }) {
           category,
           payer,
           amount: finalAmount,
-          date: new Date().toISOString().split('T')[0], // 新增時預設使用今天日期
+          date: date,
         });
       }
       onClose();
@@ -111,13 +135,53 @@ export default function TransactionModal({ onClose, editData }) {
 
           {/* 項目與快捷 */}
           <div>
-            <input 
-              type="text" 
-              placeholder="請輸入項目名稱 (例如: 午餐)" 
-              value={item}
-              onChange={(e) => setItem(e.target.value)}
-              style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', marginBottom: '10px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }}
-            />
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', background: '#F8F6F0', borderRadius: '20px', border: '1px solid #EAE3D2', overflow: 'visible', position: 'relative' }}>
+                <button onClick={handlePrevDay} style={{ background: 'transparent', border: 'none', padding: '12px 15px', color: '#D5B77A', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold' }}>◀</button>
+                <div 
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  style={{ flex: 1, padding: '12px 0', fontSize: '15px', color: '#5C5446', textAlign: 'center', fontWeight: '500', cursor: 'pointer' }}
+                >
+                  {date}
+                </div>
+                <button onClick={handleNextDay} style={{ background: 'transparent', border: 'none', padding: '12px 15px', color: '#D5B77A', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold' }}>▶</button>
+                
+                {/* 客製化白色 iOS 風格日曆 */}
+                {showCalendar && (
+                  <div style={{ position: 'absolute', top: '110%', left: '50%', transform: 'translateX(-50%)', width: '280px', background: '#fff', borderRadius: '16px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 100, padding: '16px', border: '1px solid #EAE3D2' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <button onClick={handlePrevMonth} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#5C5446', padding: '5px' }}>◀</button>
+                      <div style={{ fontWeight: 'bold', color: '#333' }}>{calendarMonth.getFullYear()}年 {calendarMonth.getMonth() + 1}月</div>
+                      <button onClick={handleNextMonth} style={{ background: 'none', border: 'none', fontSize: '16px', cursor: 'pointer', color: '#5C5446', padding: '5px' }}>▶</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '8px' }}>
+                      {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} style={{ fontSize: '12px', color: '#999' }}>{d}</div>)}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                      {Array.from({ length: new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay() }).map((_, i) => <div key={`empty-${i}`} />)}
+                      {Array.from({ length: new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate() }).map((_, i) => {
+                        const yyyy = calendarMonth.getFullYear();
+                        const mm = String(calendarMonth.getMonth() + 1).padStart(2, '0');
+                        const dd = String(i + 1).padStart(2, '0');
+                        const dateStr = `${yyyy}-${mm}-${dd}`;
+                        const isSelected = dateStr === date;
+                        const isToday = dateStr === new Date().toISOString().split('T')[0];
+                        return (
+                          <div key={i} onClick={() => { setDate(dateStr); setShowCalendar(false); }} style={{ padding: '8px 0', textAlign: 'center', cursor: 'pointer', background: isSelected ? '#D5B77A' : 'transparent', color: isSelected ? '#fff' : (isToday ? '#D5B77A' : '#333'), borderRadius: '50%', fontWeight: isSelected || isToday ? 'bold' : 'normal', fontSize: '14px' }}>{i + 1}</div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <input 
+                type="text" 
+                placeholder="請輸入項目名稱" 
+                value={item}
+                onChange={(e) => setItem(e.target.value)}
+                style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }}
+              />
+            </div>
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
               {shortcuts.map(s => (
                 <button 
