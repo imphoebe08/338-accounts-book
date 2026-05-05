@@ -40,7 +40,7 @@ function Layout({ children, user }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button className="hamburger-btn" onClick={() => setIsMenuOpen(true)}>☰</button>
           <img src="/338-acount-book_app_cover.PNG" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
-          <h1 style={{ fontSize: '18px', margin: 0 }}>簡單記帳</h1>
+          <h1 style={{ fontSize: '18px', margin: 0 }}>參參捌記帳本</h1>
         </div>
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -143,8 +143,8 @@ function App() {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', justifyContent: 'center', alignItems: 'center', background: '#F8F6F0' }}>
         <div className="card" style={{ padding: '50px 40px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px', width: '80%', maxWidth: '350px' }}>
           <img src="/338-acount-book_app_cover.PNG" alt="App Logo" style={{ width: '100px', height: '100px', margin: '0 auto', borderRadius: '24px', objectFit: 'cover', boxShadow: '0 4px 12px rgba(213, 183, 122, 0.2)' }} />
-          <h1 style={{ margin: 0, color: '#C2A363', fontSize: '28px' }}>簡單記帳</h1>
-          <p style={{ margin: 0, color: '#999', fontSize: '15px' }}>與伴侶一起共享莫蘭迪記帳生活</p>
+          <h1 style={{ margin: 0, color: '#C2A363', fontSize: '28px' }}>參參捌記帳本</h1>
+          <p style={{ margin: 0, color: '#999', fontSize: '15px' }}>陪伴羊羊面對金錢焦慮的APP</p>
           <button onClick={handleLogin} style={{ padding: '16px 28px', marginTop: '20px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '28px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 6px 16px rgba(213, 183, 122, 0.4)' }}>
             使用 Google 登入
           </button>
