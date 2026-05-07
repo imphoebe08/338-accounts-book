@@ -107,6 +107,10 @@ input[type="month"]::-webkit-calendar-picker-indicator {
   animation: fadeIn 0.3s forwards;
 }
 
+.overlay.closing {
+  animation: fadeOut 0.3s forwards;
+}
+
 @keyframes fadeIn {
   to { opacity: 1; }
 }
@@ -204,6 +208,15 @@ input[type="month"]::-webkit-calendar-picker-indicator {
   align-items: flex-end;
   justify-content: center;
   animation: fadeIn 0.2s forwards;
+}
+
+.modal-overlay.closing {
+  animation: fadeOut 0.25s forwards;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 .bottom-sheet {
@@ -375,4 +388,15 @@ input[type="month"]::-webkit-calendar-picker-indicator {
     color: #4b5563; /* Hover 時變深灰色 */
     background-color: #f3f4f6;
   }
+}
+
+/* 必填防呆閃爍動畫 */
+@keyframes shakeRed {
+  0%, 100% { transform: translateX(0); }
+  25%, 75% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+}
+.error-shake {
+  animation: shakeRed 0.4s ease-in-out;
+  box-shadow: 0 0 0 2px #ef4444 !important;
 }

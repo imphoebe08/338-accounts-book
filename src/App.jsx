@@ -15,6 +15,7 @@ const Settings = lazy(() => import('./Settings'));
 
 function Layout({ children, user }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const location = useLocation();
 
@@ -31,7 +32,13 @@ function Layout({ children, user }) {
     { path: '/settings', label: '設定' },
   ];
 
-  const closeMenu = () => setIsMenuOpen(false);
+  const closeMenu = () => {
+    setIsMenuClosing(true);
+    setTimeout(() => {
+      setIsMenuOpen(false);
+      setIsMenuClosing(false);
+    }, 300); // 配合 CSS 0.3s 的轉場動畫時間
+  };
 
   // 取得當前頁面的標題
   const currentNav = navItems.find(item => item.path === location.pathname);
@@ -60,10 +67,10 @@ function Layout({ children, user }) {
       </header>
 
       {/* 側邊欄遮罩 */}
-      {isMenuOpen && <div className="overlay" onClick={closeMenu}></div>}
+      {isMenuOpen && <div className={`overlay ${isMenuClosing ? 'closing' : ''}`} onClick={closeMenu}></div>}
 
       {/* 側邊收折選單 */}
-      <nav className={`side-menu ${isMenuOpen ? 'open' : ''}`}>
+      <nav className={`side-menu ${isMenuOpen && !isMenuClosing ? 'open' : ''}`}>
         <div className="side-menu-header">Menu</div>
         <div style={{ flex: 1, paddingTop: '10px' }}>
           {navItems.map((item) => (

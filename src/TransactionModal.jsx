@@ -35,6 +35,14 @@ export default function TransactionModal({ onClose, editData }) {
   const availablePayers = configData.payers || PAYERS;
   const [category, setCategory] = useState(editData?.category || '');
   const [payer, setPayer] = useState(editData?.payer || '');
+  const [errors, setErrors] = useState([]);
+
+  // 平滑關閉動畫狀態
+  const [isClosing, setIsClosing] = useState(false);
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(onClose, 250); // 等待滑出動畫完成後再真正卸載元件
+  };
 
   // 拖曳下滑關閉邏輯
   const [dragY, setDragY] = useState(0);
@@ -46,7 +54,7 @@ export default function TransactionModal({ onClose, editData }) {
   };
   const handleTouchEnd = () => {
     if (dragY > 100) {
-      onClose();
+      handleClose();
     } else {
       setDragY(0);
     }
@@ -91,16 +99,14 @@ export default function TransactionModal({ onClose, editData }) {
 
   const handleSubmit = async () => {
     // 必填欄位檢測
-    if (!item.trim()) {
-      alert('請輸入項目名稱');
-      return;
-    }
-    if (!payer) {
-      alert('請選擇付款人');
-      return;
-    }
-    if (!category) {
-      alert('請選擇分類');
+    const newErrors = [];
+    if (!item.trim()) newErrors.push('item');
+    if (!payer) newErrors.push('payer');
+    if (!category) newErrors.push('category');
+
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
+      setTimeout(() => setErrors([]), 800); // 800ms 後移除紅框，以便下次還能觸發動畫
       return;
     }
 
@@ -139,7 +145,7 @@ export default function TransactionModal({ onClose, editData }) {
           date: date,
         });
       }
-      onClose();
+      handleClose();
     } catch (error) {
       console.error("寫入失敗:", error);
       alert('發生錯誤，請稍後再試！');
@@ -147,20 +153,22 @@ export default function TransactionModal({ onClose, editData }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleClose}>
       <div 
         className="bottom-sheet" 
         onClick={(e) => e.stopPropagation()}
-        style={{ transform: dragY > 0 ? `translateY(${dragY}px)` : '', transition: dragY > 0 ? 'none' : 'transform 0.2s ease' }}
+        style={{ transform: isClosing ? 'translateY(100%)' : (dragY > 0 ? `translateY(${dragY}px)` : ''), transition: isClosing ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : (dragY > 0 ? 'none' : 'transform 0.2s ease') }}
       >
-        {/* 頂部下滑拖曳把手 */}
-        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'grab', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
-        </div>
+        {/* 將可拖曳的範圍擴大到包含把手與頁籤區塊 */}
+        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+          <div onClick={handleClose} title="點擊收起" style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
+          </div>
 
-        <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>支出</button>
-          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>收入</button>
+          <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
+            <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>支出</button>
+            <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>收入</button>
+          </div>
         </div>
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
@@ -219,7 +227,8 @@ export default function TransactionModal({ onClose, editData }) {
                 placeholder="請輸入項目名稱" 
                 value={item}
                 onChange={(e) => setItem(e.target.value)}
-                style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }}
+                className={errors.includes('item') ? 'error-shake' : ''}
+                style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
@@ -238,7 +247,7 @@ export default function TransactionModal({ onClose, editData }) {
           {/* 付款人 */}
           <div>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>付款人</div>
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px' }}>
+            <div className={errors.includes('payer') ? 'error-shake' : ''} style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', padding: '2px', borderRadius: '24px' }}>
               {availablePayers.map(p => (
                 <button 
                   key={p} 
@@ -254,7 +263,7 @@ export default function TransactionModal({ onClose, editData }) {
           {/* 分類 */}
           <div>
             <div style={{ fontSize: '14px', color: '#666', marginBottom: '8px', fontWeight: 'bold' }}>分類</div>
-            <div className="category-grid" style={{ padding: 0, maxHeight: '150px' }}>
+            <div className={`category-grid ${errors.includes('category') ? 'error-shake' : ''}`} style={{ padding: '4px', maxHeight: '150px', borderRadius: '16px' }}>
               {categories.map(cat => (
                 <button key={cat} className={`cat-btn ${category === cat ? 'active' : ''}`} onClick={() => setCategory(cat)}>{cat}</button>
               ))}

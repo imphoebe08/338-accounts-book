@@ -38,6 +38,14 @@ export default function AssetModal({ onClose, editData }) {
   const availableStocks = configData.stocks || STOCKS || [];
   const availableBanks = configData.banks || BANKS || [];
   const availablePayers = configData.payers || PAYERS || [];
+  const [errors, setErrors] = useState([]);
+
+  // 平滑關閉動畫狀態
+  const [isClosing, setIsClosing] = useState(false);
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(onClose, 250);
+  };
 
   // 拖曳下滑關閉邏輯
   const [dragY, setDragY] = useState(0);
@@ -49,7 +57,7 @@ export default function AssetModal({ onClose, editData }) {
   };
   const handleTouchEnd = () => {
     if (dragY > 100) {
-      onClose();
+      handleClose();
     } else {
       setDragY(0);
     }
@@ -61,8 +69,13 @@ export default function AssetModal({ onClose, editData }) {
   };
 
   const handleSubmit = async () => {
-    if (!formData.item || !formData.bank) {
-      alert('請填寫必填欄位 (項目名稱與銀行)');
+    const newErrors = [];
+    if (!formData.item.trim()) newErrors.push('item');
+    if (!formData.bank.trim()) newErrors.push('bank');
+    
+    if (newErrors.length > 0) {
+      setErrors(newErrors);
+      setTimeout(() => setErrors([]), 800);
       return;
     }
     try {
@@ -97,7 +110,7 @@ export default function AssetModal({ onClose, editData }) {
       } else {
         await addDoc(collection(db, 'assets'), baseData);
       }
-      onClose();
+      handleClose();
     } catch (err) {
       console.error('新增資產失敗:', err);
       alert('發生錯誤，請稍後再試！');
@@ -105,26 +118,26 @@ export default function AssetModal({ onClose, editData }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className={`modal-overlay ${isClosing ? 'closing' : ''}`} onClick={handleClose}>
       <div 
         className="bottom-sheet" 
         onClick={(e) => e.stopPropagation()}
-        style={{ transform: dragY > 0 ? `translateY(${dragY}px)` : '', transition: dragY > 0 ? 'none' : 'transform 0.2s ease' }}
+        style={{ transform: isClosing ? 'translateY(100%)' : (dragY > 0 ? `translateY(${dragY}px)` : ''), transition: isClosing ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : (dragY > 0 ? 'none' : 'transform 0.2s ease') }}
       >
-        {/* 頂部下滑拖曳把手 */}
-        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'grab', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
-        </div>
-
-        <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
-          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
-          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
+        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+          <div onClick={handleClose} title="點擊收起" style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
+          </div>
+          <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
+            <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
+            <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
+            <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
+          </div>
         </div>
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff', flex: 1, overflowY: 'auto' }}>
-          <input type="text" name="item" placeholder="項目名稱 (例如: 台積電、薪轉戶)" value={formData.item} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+          <input type="text" name="item" placeholder="項目名稱 (例如: 台積電、薪轉戶)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
           {assetType === 'stock' && availableStocks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableStocks.map(s => (
@@ -133,7 +146,7 @@ export default function AssetModal({ onClose, editData }) {
             </div>
           )}
 
-          <input type="text" name="bank" placeholder="銀行 / 券商" value={formData.bank} onChange={handleChange} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0' }} />
+          <input type="text" name="bank" placeholder="銀行 / 券商" value={formData.bank} onChange={handleChange} className={errors.includes('bank') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
           {availableBanks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableBanks.map(b => (

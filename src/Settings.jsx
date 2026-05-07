@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
-import { collection, addDoc, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
 
 export default function Settings() {
@@ -11,6 +11,10 @@ export default function Settings() {
   const [payers, setPayers] = useState(PAYERS);
   const [stocks, setStocks] = useState(STOCKS);
   const [banks, setBanks] = useState(BANKS);
+
+  // 匯出 CSV 用的日期範圍
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   // 載入 Firebase 設定資料
   useEffect(() => {
@@ -39,6 +43,56 @@ export default function Settings() {
   // 更新資料回 Firebase
   const updateSetting = async (key, newList) => {
     await setDoc(doc(db, 'settings', 'user_prefs'), { [key]: newList }, { merge: true });
+  };
+
+  // 下載 CSV 工具函式
+  const downloadCSV = (csvContent, fileName) => {
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // 加上 \uFEFF BOM 避免 Excel 中文亂碼
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 處理匯出 CSV 邏輯
+  const handleExportCSV = async (type) => {
+    try {
+      if (type === 'transactions') {
+        const snapshot = await getDocs(query(collection(db, "transactions"), orderBy("date", "desc")));
+        if (snapshot.empty) return alert('目前沒有收支紀錄可以匯出');
+
+        let dataToExport = [];
+        snapshot.forEach(doc => dataToExport.push(doc.data()));
+
+        if (exportStartDate) dataToExport = dataToExport.filter(d => d.date >= exportStartDate);
+        if (exportEndDate) dataToExport = dataToExport.filter(d => d.date <= exportEndDate);
+
+        if (dataToExport.length === 0) return alert('在此日期區間內沒有收支紀錄可以匯出');
+
+        let csv = '日期,類型,分類,項目內容,付款人,金額\n';
+        dataToExport.forEach(d => {
+          csv += `${d.date},${d.type === 'expense' ? '支出' : '收入'},${d.category},${d.item || ''},${d.payer || ''},${d.amount}\n`;
+        });
+        
+        const rangeStr = (exportStartDate || exportEndDate) ? `_${exportStartDate || '起'}至${exportEndDate || '今'}` : '';
+        downloadCSV(csv, `收支紀錄備份${rangeStr}.csv`);
+      } else if (type === 'assets') {
+        const snapshot = await getDocs(collection(db, "assets"));
+        if (snapshot.empty) return alert('目前沒有財產清單可以匯出');
+        let csv = '資產類型,項目名稱,銀行/券商,持有人,持有股數,單筆/現有金額/持有均價,預定利率,開始日,到期日,參考現值\n';
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          const t = d.type === 'stock' ? '股票' : (d.type === 'demand' ? '活期存款' : '定期存款');
+          csv += `${t},${d.item},${d.bank},${d.holder || ''},${d.shares || ''},${d.cost || d.amount || ''},${d.interestRate || ''},${d.startDate || ''},${d.endDate || ''},${d.refPrice || ''}\n`;
+        });
+        downloadCSV(csv, `財產清單備份_${new Date().toISOString().split('T')[0]}.csv`);
+      }
+    } catch (e) {
+      alert('匯出時發生錯誤！');
+    }
   };
 
   // 處理 Notion CSV 匯入邏輯
@@ -203,6 +257,22 @@ export default function Settings() {
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ef4444' }}>匯入「支出」CSV</h4>
             <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F8F6F0', boxSizing: 'border-box' }} />
           </div>
+        </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="資料備份與匯出" titleColor="#f59e0b">
+        <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>將雲端的資料匯出成 CSV 檔案，你可以將其作為本地備份，或是匯入至 Notion 表格中作進階管理與歸檔。</p>
+        
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#5C5446' }}>匯出期間 (選填):</span>
+          <input type="date" value={exportStartDate} onChange={e => setExportStartDate(e.target.value)} style={{ padding: '8px', borderRadius: '8px', border: '1px solid #EAE3D2', color: '#5C5446', outline: 'none' }} />
+          <span style={{ color: '#999' }}>至</span>
+          <input type="date" value={exportEndDate} onChange={e => setExportEndDate(e.target.value)} style={{ padding: '8px', borderRadius: '8px', border: '1px solid #EAE3D2', color: '#5C5446', outline: 'none' }} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '15px' }}>
+          <button onClick={() => handleExportCSV('transactions')} style={{ flex: 1, padding: '12px', background: '#fff', border: '2px solid #f59e0b', color: '#f59e0b', borderRadius: '16px', cursor: 'pointer', fontWeight: 'bold' }}>📥 匯出收支紀錄</button>
+          <button onClick={() => handleExportCSV('assets')} style={{ flex: 1, padding: '12px', background: '#fff', border: '2px solid #3b82f6', color: '#3b82f6', borderRadius: '16px', cursor: 'pointer', fontWeight: 'bold' }}>📥 匯出財產清單</button>
         </div>
       </CollapsibleCard>
 
