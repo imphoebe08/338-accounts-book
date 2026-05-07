@@ -33,8 +33,8 @@ export default function TransactionModal({ onClose, editData }) {
   const categories = type === 'expense' ? configData.expenseCats : configData.incomeCats;
   const shortcuts = type === 'expense' ? configData.expenseShorts : configData.incomeShorts;
   const availablePayers = configData.payers || PAYERS;
-  const [category, setCategory] = useState(editData?.category || EXPENSE_CATEGORIES[0]);
-  const [payer, setPayer] = useState(editData?.payer || availablePayers[0] || '');
+  const [category, setCategory] = useState(editData?.category || '');
+  const [payer, setPayer] = useState(editData?.payer || '');
 
   // 拖曳下滑關閉邏輯
   const [dragY, setDragY] = useState(0);
@@ -90,6 +90,20 @@ export default function TransactionModal({ onClose, editData }) {
   const keys = ['7', '8', '9', '今天', '4', '5', '6', '+', '1', '2', '3', '-', 'C', '0', '⌫', '完成'];
 
   const handleSubmit = async () => {
+    // 必填欄位檢測
+    if (!item.trim()) {
+      alert('請輸入項目名稱');
+      return;
+    }
+    if (!payer) {
+      alert('請選擇付款人');
+      return;
+    }
+    if (!category) {
+      alert('請選擇分類');
+      return;
+    }
+
     let finalAmount = 0;
     try {
       // 使用 Function 取代 eval，提升安全性與解析效能
@@ -109,7 +123,7 @@ export default function TransactionModal({ onClose, editData }) {
       if (editData) {
         await updateDoc(doc(db, 'transactions', editData.id), {
           type,
-          item: item || category,
+          item: item,
           category,
           payer,
           amount: finalAmount,
@@ -118,7 +132,7 @@ export default function TransactionModal({ onClose, editData }) {
       } else {
         await addDoc(collection(db, 'transactions'), {
           type,
-          item: item || category,
+          item: item,
           category,
           payer,
           amount: finalAmount,
@@ -145,8 +159,8 @@ export default function TransactionModal({ onClose, editData }) {
         </div>
 
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(configData.expenseCats[0] || ''); setAmount('0'); setItem(''); }}>支出</button>
-          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(configData.incomeCats[0] || ''); setAmount('0'); setItem(''); }}>收入</button>
+          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>支出</button>
+          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(''); setPayer(''); setAmount('0'); setItem(''); }}>收入</button>
         </div>
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}

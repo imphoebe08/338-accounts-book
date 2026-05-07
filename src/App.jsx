@@ -25,13 +25,17 @@ function Layout({ children, user }) {
   };
 
   const navItems = [
-    { path: '/', label: '收支總覽', icon: '📝' },
-    { path: '/analysis', label: '財況分析', icon: '📊' },
-    { path: '/assets', label: '資產', icon: '💰' },
-    { path: '/settings', label: '設定', icon: '⚙️' },
+    { path: '/', label: '收支總覽' },
+    { path: '/analysis', label: '財況分析' },
+    { path: '/assets', label: '資產' },
+    { path: '/settings', label: '設定' },
   ];
 
   const closeMenu = () => setIsMenuOpen(false);
+
+  // 取得當前頁面的標題
+  const currentNav = navItems.find(item => item.path === location.pathname);
+  const pageTitle = currentNav ? currentNav.label : '簡單記帳';
 
   return (
     <div className="app-container">
@@ -39,8 +43,7 @@ function Layout({ children, user }) {
       <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
           <button className="hamburger-btn" onClick={() => setIsMenuOpen(true)}>☰</button>
-          <img src="/338-acount-book_app_cover.PNG" alt="Logo" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }} />
-          <h1 style={{ fontSize: '18px', margin: 0 }}>參參捌記帳本</h1>
+          <h1 style={{ fontSize: '18px', margin: 0 }}>{pageTitle}</h1>
         </div>
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -70,7 +73,6 @@ function Layout({ children, user }) {
               className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
               onClick={closeMenu}
             >
-              <span className="nav-icon" style={{ fontSize: '20px' }}>{item.icon}</span>
               <span className="nav-label">{item.label}</span>
             </Link>
           ))}
