@@ -36,6 +36,22 @@ export default function TransactionModal({ onClose, editData }) {
   const [category, setCategory] = useState(editData?.category || EXPENSE_CATEGORIES[0]);
   const [payer, setPayer] = useState(editData?.payer || availablePayers[0] || '');
 
+  // 拖曳下滑關閉邏輯
+  const [dragY, setDragY] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const handleTouchStart = (e) => setStartY(e.touches[0].clientY);
+  const handleTouchMove = (e) => {
+    const currentY = e.touches[0].clientY;
+    if (currentY > startY) setDragY(currentY - startY);
+  };
+  const handleTouchEnd = () => {
+    if (dragY > 100) {
+      onClose();
+    } else {
+      setDragY(0);
+    }
+  };
+
   useEffect(() => {
     setCalendarMonth(new Date(date));
   }, [date]);
@@ -118,13 +134,23 @@ export default function TransactionModal({ onClose, editData }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="bottom-sheet" onClick={(e) => e.stopPropagation()}>
+      <div 
+        className="bottom-sheet" 
+        onClick={(e) => e.stopPropagation()}
+        style={{ transform: dragY > 0 ? `translateY(${dragY}px)` : '', transition: dragY > 0 ? 'none' : 'transform 0.2s ease' }}
+      >
+        {/* 頂部下滑拖曳把手 */}
+        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd} style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'grab', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
+        </div>
+
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} style={{ borderTopLeftRadius: '24px' }} onClick={() => { setType('expense'); setCategory(configData.expenseCats[0] || ''); setAmount('0'); setItem(''); }}>支出</button>
-          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} style={{ borderTopRightRadius: '24px' }} onClick={() => { setType('income'); setCategory(configData.incomeCats[0] || ''); setAmount('0'); setItem(''); }}>收入</button>
+          <button className={`tab-btn ${type === 'expense' ? 'active' : ''}`} onClick={() => { setType('expense'); setCategory(configData.expenseCats[0] || ''); setAmount('0'); setItem(''); }}>支出</button>
+          <button className={`tab-btn ${type === 'income' ? 'active' : ''}`} onClick={() => { setType('income'); setCategory(configData.incomeCats[0] || ''); setAmount('0'); setItem(''); }}>收入</button>
         </div>
         
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff' }}>
+        {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff', flex: 1, overflowY: 'auto' }}>
           {/* 金額顯示 */}
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '2px solid #D5B77A', paddingBottom: '5px' }}>
             <span style={{ fontSize: '24px', fontWeight: 'bold', color: type === 'expense' ? '#ef4444' : '#10b981', marginRight: '10px' }}>$</span>
