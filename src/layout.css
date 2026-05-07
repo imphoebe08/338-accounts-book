@@ -1,3 +1,8 @@
+html {
+  /* 關閉手機瀏覽器原生的下拉重新整理功能，讓體驗更像原生 APP */
+  overscroll-behavior-y: none;
+}
+
 body, button, input, select, textarea {
   margin: 0;
   font-family: "Nunito", "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

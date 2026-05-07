@@ -50,8 +50,21 @@ export default function AssetModal({ onClose, editData }) {
   // 拖曳下滑關閉邏輯
   const [dragY, setDragY] = useState(0);
   const [startY, setStartY] = useState(0);
-  const handleTouchStart = (e) => setStartY(e.touches[0].clientY);
+  const handleTouchStart = (e) => {
+    let target = e.target;
+    let shouldIgnoreDrag = false;
+    // 檢查點擊位置是否在一個已經有捲動進度的區塊內，避免把拖曳和捲動衝突
+    while (target && target !== e.currentTarget) {
+      if (target.scrollHeight > target.clientHeight && target.scrollTop > 0) {
+        shouldIgnoreDrag = true;
+        break;
+      }
+      target = target.parentNode;
+    }
+    setStartY(shouldIgnoreDrag ? null : e.touches[0].clientY);
+  };
   const handleTouchMove = (e) => {
+    if (startY === null) return;
     const currentY = e.touches[0].clientY;
     if (currentY > startY) setDragY(currentY - startY);
   };
@@ -123,16 +136,17 @@ export default function AssetModal({ onClose, editData }) {
         className="bottom-sheet" 
         onClick={(e) => e.stopPropagation()}
         style={{ transform: isClosing ? 'translateY(100%)' : (dragY > 0 ? `translateY(${dragY}px)` : ''), transition: isClosing ? 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)' : (dragY > 0 ? 'none' : 'transform 0.2s ease') }}
+        onTouchStart={handleTouchStart} 
+        onTouchMove={handleTouchMove} 
+        onTouchEnd={handleTouchEnd}
       >
-        <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
-          <div onClick={handleClose} title="點擊收起" style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
-            <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
-          </div>
-          <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-            <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
-            <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
-            <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
-          </div>
+        <div onClick={handleClose} title="點擊收起" style={{ width: '100%', padding: '12px 0', background: '#F8F6F0', cursor: 'pointer', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
+        </div>
+        <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
+          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
+          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
+          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
         </div>
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
