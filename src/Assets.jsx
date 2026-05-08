@@ -229,6 +229,7 @@ export default function Assets({ assets }) {
                   {stock.item} {stock.symbol && <span style={{ fontSize: '14px', color: '#999', fontWeight: 'normal', marginLeft: '4px' }}>({stock.symbol})</span>}
                 </strong>
                 <span style={{ color: '#666', fontSize: '14px' }}>{stock.holder} ({stock.bank})</span>
+              </div>
               <Row label="持有股數" value={stock.shares.toLocaleString()} />
               <Row label="持有成本" value={`$${stock.cost.toLocaleString()}`} />
               <Row label="參考現值" value={`$${stock.refPrice.toLocaleString()}`} color="#10b981" />
