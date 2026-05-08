@@ -56,41 +56,49 @@ export default function Assets({ assets }) {
     setIsFetching(true);
     try {
       let successCount = 0;
-      const priceMap = {};
-
-      // 1. 預先一次性抓取台灣上市與上櫃的今日/昨日收盤價 (無 CORS 限制且極度穩定)
-      try {
-        const twseRes = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
-        if (twseRes.ok) {
-          const twseData = await twseRes.json();
-          twseData.forEach(item => {
-            if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice.replace(/,/g, ''));
-          });
-        }
-      } catch (err) {
-        console.warn("上市 API 抓取失敗", err);
-      }
-      
-      try {
-        const tpexRes = await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
-        if (tpexRes.ok) {
-          const tpexData = await tpexRes.json();
-          tpexData.forEach(item => {
-            if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close.replace(/,/g, ''));
-          });
-        }
-      } catch (err) {
-        console.warn("上櫃 API 抓取失敗", err);
-      }
-      
-      // 2. 將抓到的價格更新到資料庫
       const today = new Date().toISOString().split('T')[0];
+      
+      // 使用 Promise.all 併發執行，大幅縮短等待時間 (1~2秒內完成)
       await Promise.all(stocks.map(async (stock) => {
         let symbol = stock.symbol?.trim();
+        if (!symbol) {
+          // 支援舊資料提取：若只有名稱，自動尋找括號或數字作為代碼
+          const match = stock.item.match(/\(([A-Za-z0-9.]+)\)/) || stock.item.match(/\d{4,}/) || stock.item.match(/[A-Za-z0-9.]+/);
+          symbol = match ? (match[1] || match[0]) : '';
+        }
         if (!symbol) return;
         
-        let price = priceMap[symbol];
-        if (price && !isNaN(price)) {
+        let cleanSymbol = symbol.toUpperCase().replace('.TW', '').replace('.TWO', '');
+        const isTw = /^[A-Z0-9]{4,6}$/.test(cleanSymbol) && !isNaN(cleanSymbol[0]);
+        const suffixes = isTw ? ['.TW', '.TWO'] : [''];
+        
+        let price = null;
+
+        for (const suffix of suffixes) {
+          if (price) break;
+          // 使用 Yahoo Finance API 回傳輕量 JSON，解析最為精準且快速
+          const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}${suffix}?interval=1d&range=1d`;
+          
+          const proxies = [
+            `https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(targetUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+          ];
+
+          for (const proxyUrl of proxies) {
+            if (price) break;
+            try {
+              const res = await fetch(proxyUrl);
+              if (!res.ok) continue;
+              let data = await res.json();
+              if (proxyUrl.includes('allorigins') && data.contents) data = JSON.parse(data.contents);
+              
+              const quotePrice = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              if (quotePrice && !isNaN(quotePrice)) price = Number(quotePrice);
+            } catch (err) { /* 忽略並嘗試下一個 proxy */ }
+          }
+        }
+
+        if (price && price > 0) {
           await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
           successCount++;
         }
