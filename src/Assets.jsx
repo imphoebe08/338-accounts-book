@@ -55,8 +55,12 @@ export default function Assets({ assets }) {
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
-      // 呼叫 Vercel 雲端的 Python Serverless Function
-      const res = await fetch('/api/update_prices', {
+      // 自動判斷：若在本地開發則呼叫本機 Flask，若在 Vercel 則呼叫 Serverless Function
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://127.0.0.1:5000/update-prices' 
+        : '/api/update_prices';
+
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
