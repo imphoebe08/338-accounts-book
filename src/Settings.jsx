@@ -1,3 +1,4 @@
+// 設定與資料管理頁面
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
 import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy } from 'firebase/firestore';
@@ -190,7 +191,7 @@ export default function Settings() {
           category: categoryStr || '其他',
           date: parsedDate,
           amount: finalAmount,
-        type: fileType // 強制使用上傳時指定的類型 (income 或 expense)
+          type: fileType // 強制使用上傳時指定的類型 (income 或 expense)
         };
       }).filter(item => item.item !== '' || item.amount !== 0); // 濾除無效空行
 
