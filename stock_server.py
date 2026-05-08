@@ -3,7 +3,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
-import yfinance as yf
+import urllib.request
+import json
 import datetime
 
 app = Flask(__name__)
@@ -45,11 +46,13 @@ def update_prices():
                 if price: break
                 query_symbol = f"{clean_symbol}{suffix}"
                 try:
-                    # 使用 yfinance 抓取最新資訊
-                    ticker = yf.Ticker(query_symbol)
-                    info = ticker.fast_info
-                    if 'lastPrice' in info:
-                        price = info['lastPrice']
+                    url = f"https://query2.finance.yahoo.com/v8/finance/chart/{query_symbol}?interval=1d&range=1d"
+                    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        res_data = json.loads(response.read().decode())
+                        quote_price = res_data.get('chart', {}).get('result', [{}])[0].get('meta', {}).get('regularMarketPrice')
+                        if quote_price is not None:
+                            price = float(quote_price)
                 except Exception:
                     pass
             
