@@ -162,10 +162,13 @@ export default function AssetModal({ onClose, editData }) {
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff', flex: 1, overflowY: 'auto' }}>
           {assetType === 'stock' ? (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input type="text" name="symbol" placeholder="代碼 (如: 2330)" value={formData.symbol} onChange={handleChange} className={errors.includes('symbol') ? 'error-shake' : ''} style={{ width: '140px', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
-              <input type="text" name="item" placeholder="名稱 (如: 台積電)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
-            </div>
+            <>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input type="text" name="symbol" placeholder="股票代碼 (必填)" value={formData.symbol} onChange={handleChange} className={errors.includes('symbol') ? 'error-shake' : ''} style={{ width: '130px', padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+                <input type="text" name="item" placeholder="股票名稱 (必填)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ flex: 1, padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+              </div>
+              <div style={{ fontSize: '13px', color: '#999', paddingLeft: '4px', marginTop: '-8px' }}>* 系統將依據上方「代碼」精準抓取最新收盤價</div>
+            </>
           ) : (
             <input type="text" name="item" placeholder="項目名稱 (例如: 薪轉戶、緊急預備金)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
           )}

@@ -60,34 +60,40 @@ export default function Assets({ assets }) {
       // 1. 預先一次性抓取台灣上市與上櫃的今日/昨日收盤價 (無 CORS 限制且極度穩定)
       const priceMap = {};
       try {
-        const [twseRes, tpexRes] = await Promise.allSettled([
-          fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'),
-          fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes')
-        ]);
-        
-        if (twseRes.status === 'fulfilled' && twseRes.value.ok) {
-          const twseData = await twseRes.value.json();
+        const twseRes = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+        if (twseRes.ok) {
+          const twseData = await twseRes.json();
           twseData.forEach(item => {
-            if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice);
-          });
-        }
-        
-        if (tpexRes.status === 'fulfilled' && tpexRes.value.ok) {
-          const tpexData = await tpexRes.value.json();
-          tpexData.forEach(item => {
-            if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close);
+            if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice.replace(/,/g, ''));
           });
         }
       } catch (err) {
-        console.warn("政府 API 抓取失敗，將使用備用方案", err);
+        console.warn("上市 API 抓取失敗", err);
+      }
+      
+      try {
+        const tpexRes = await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
+        if (tpexRes.ok) {
+          const tpexData = await tpexRes.json();
+          tpexData.forEach(item => {
+            if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close.replace(/,/g, ''));
+          });
+        }
+      } catch (err) {
+        console.warn("上櫃 API 抓取失敗", err);
       }
 
       await Promise.all(stocks.map(async (stock) => {
+        let symbol = stock.symbol?.trim();
+        if (!symbol) {
+          // 支援舊資料：優先提取括號內的代碼，或是四位數字
+          const match = stock.item.match(/\(([A-Za-z0-9.]+)\)/) || stock.item.match(/\d{4,}/) || stock.item.match(/[A-Za-z0-9.]+/);
           symbol = match ? (match[1] || match[0]) : '';
         }
         if (!symbol) return;
 
-        let price = priceMap[symbol]; // 優先使用政府 API 取得的價格
+        let cleanSymbol = symbol.replace('.TW', '').replace('.TWO', '');
+        let price = priceMap[cleanSymbol]; // 優先使用政府 API 取得的價格
         
         // 2. 若政府 API 沒查到 (可能是美股或 ETF)，才使用 Yahoo 備用方案
         if (!price) {
@@ -118,6 +124,7 @@ export default function Assets({ assets }) {
 
                 // 多種正則匹配 Yahoo 網頁的價格
                 const matchPrice = htmlText.match(/data-field="regularMarketPrice"[^>]*value="([\d.]+)"/) || 
+                                   htmlText.match(/data-field="regularMarketPrice"[^>]*data-value="([\d.]+)"/) ||
                                    htmlText.match(/"regularMarketPrice":\s*\{\s*"raw":\s*([\d.]+)/) ||
                                    htmlText.match(/<fin-streamer[^>]*data-symbol="[^"]*"[^>]*data-field="regularMarketPrice"[^>]*>([\d.,]+)<\/fin-streamer>/);
                 if (matchPrice && matchPrice[1]) {
