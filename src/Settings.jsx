@@ -319,45 +319,6 @@ function ManageStockList({ items = [], onUpdate }) {
   );
 }
 
-// 專門用於股票管理的清單元件 (區分代碼與名稱)
-function ManageStockList({ items = [], onUpdate }) {
-  const [newSymbol, setNewSymbol] = useState('');
-  const [newName, setNewName] = useState('');
-
-  const handleAdd = () => {
-    if (newSymbol.trim() && newName.trim()) {
-      onUpdate([...items, { symbol: newSymbol.trim(), name: newName.trim() }]);
-      setNewSymbol('');
-      setNewName('');
-    } else {
-      alert('請同時輸入股票代碼與名稱！');
-    }
-  };
-
-  return (
-    <div style={{ marginBottom: '20px' }}>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-        <input type="text" placeholder="代碼 (如: 2330)" value={newSymbol} onChange={e => setNewSymbol(e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '12px', border: '1px solid #EAE3D2', outline: 'none' }} />
-        <input type="text" placeholder="名稱 (如: 台積電)" value={newName} onChange={e => setNewName(e.target.value)} style={{ flex: 1.5, padding: '8px 12px', borderRadius: '12px', border: '1px solid #EAE3D2', outline: 'none' }} />
-        <button onClick={handleAdd} style={{ padding: '8px 16px', background: '#fff', border: `1px dashed #3b82f6`, color: '#3b82f6', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>+ 新增</button>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-        {items.map((item, index) => {
-          const isObj = typeof item === 'object' && item !== null;
-          const symbol = isObj ? item.symbol : (item.match(/\(([A-Za-z0-9.]+)\)/) || item.match(/\d{4,}/) || item.match(/[A-Za-z0-9.]+/) || [''])[0].replace(/[()]/g, '');
-          const name = isObj ? item.name : item.replace(/\([A-Za-z0-9.]+\)/, '').replace(/[A-Za-z0-9.]+/g, '').trim();
-          return (
-            <div key={index} style={{ display: 'flex', alignItems: 'center', background: '#F8F6F0', borderRadius: '24px', overflow: 'hidden', border: '1px solid #EAE3D2' }}>
-              <span style={{ padding: '8px 10px 8px 14px', fontSize: '14px', color: '#5C5446' }}>{symbol} {name}</span>
-              <button onClick={() => { if (window.confirm('確定要刪除嗎？')) onUpdate(items.filter((_, i) => i !== index)); }} style={{ padding: '8px 12px', background: 'transparent', border: 'none', color: '#999', cursor: 'pointer', fontSize: '14px' }} title="刪除">✕</button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // 收縮/展開卡片元件
 function CollapsibleCard({ title, titleColor, children }) {
   const [isOpen, setIsOpen] = useState(false);
