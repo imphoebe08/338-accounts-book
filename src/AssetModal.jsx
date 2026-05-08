@@ -163,9 +163,15 @@ export default function AssetModal({ onClose, editData }) {
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff', flex: 1, overflowY: 'auto' }}>
           {assetType === 'stock' ? (
             <>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input type="text" name="symbol" placeholder="股票代碼 (必填)" value={formData.symbol} onChange={handleChange} className={errors.includes('symbol') ? 'error-shake' : ''} style={{ width: '130px', padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
-                <input type="text" name="item" placeholder="股票名稱 (必填)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ flex: 1, padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px', fontWeight: 'bold' }}>股票代碼 (必填)</div>
+                  <input type="text" name="symbol" placeholder="如: 2330" value={formData.symbol} onChange={handleChange} className={errors.includes('symbol') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '16px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+                </div>
+                <div style={{ flex: 1.5 }}>
+                  <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px', fontWeight: 'bold' }}>股票名稱 (必填)</div>
+                  <input type="text" name="item" placeholder="如: 台積電" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '15px', border: '1px solid #EAE3D2', borderRadius: '16px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+                </div>
               </div>
               <div style={{ fontSize: '13px', color: '#999', paddingLeft: '4px', marginTop: '-8px' }}>* 系統將依據上方「代碼」精準抓取最新收盤價</div>
             </>
