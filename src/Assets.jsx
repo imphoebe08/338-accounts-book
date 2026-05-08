@@ -83,10 +83,10 @@ export default function Assets({ assets }) {
       }
 
       await Promise.all(stocks.map(async (stock) => {
-        const match = stock.item.match(/[A-Za-z0-9]+/); // 自動提取股票代號 (支援美股或台灣上櫃)
-        if (!match) return;
-        
-        const symbol = match[0];
+          symbol = match ? (match[1] || match[0]) : '';
+        }
+        if (!symbol) return;
+
         let price = priceMap[symbol]; // 優先使用政府 API 取得的價格
         
         // 2. 若政府 API 沒查到 (可能是美股或 ETF)，才使用 Yahoo 備用方案
@@ -226,9 +226,10 @@ export default function Assets({ assets }) {
           {stocks.map(stock => (
             <div className="card" key={stock.id}>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '10px' }}>
-                <strong style={{ fontSize: '18px' }}>{stock.item}</strong>
+                <strong style={{ fontSize: '18px' }}>
+                  {stock.item} {stock.symbol && <span style={{ fontSize: '14px', color: '#999', fontWeight: 'normal', marginLeft: '4px' }}>({stock.symbol})</span>}
+                </strong>
                 <span style={{ color: '#666', fontSize: '14px' }}>{stock.holder} ({stock.bank})</span>
-              </div>
               <Row label="持有股數" value={stock.shares.toLocaleString()} />
               <Row label="持有成本" value={`$${stock.cost.toLocaleString()}`} />
               <Row label="參考現值" value={`$${stock.refPrice.toLocaleString()}`} color="#10b981" />

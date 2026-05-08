@@ -9,6 +9,7 @@ const FIXED_SHORTCUTS = ['一般定存', '優利定存', '專案定存', '外幣
 export default function AssetModal({ onClose, editData }) {
   const [assetType, setAssetType] = useState(editData?.type || 'stock'); // 'stock', 'demand', 'fixed'
   const [formData, setFormData] = useState({
+    symbol: editData?.symbol || '', 
     item: editData?.item || '', 
     shares: editData?.shares !== undefined ? String(editData.shares) : '', 
     cost: editData?.cost !== undefined ? String(editData.cost) : '', 
@@ -91,6 +92,7 @@ export default function AssetModal({ onClose, editData }) {
   const handleSubmit = async () => {
     const newErrors = [];
     if (!formData.item.trim()) newErrors.push('item');
+    if (assetType === 'stock' && !formData.symbol.trim()) newErrors.push('symbol');
     if (!formData.bank.trim()) newErrors.push('bank');
     
     if (newErrors.length > 0) {
@@ -107,6 +109,7 @@ export default function AssetModal({ onClose, editData }) {
         updatedAt: new Date().toISOString().split('T')[0],
       };
       if (assetType === 'stock') {
+        baseData.symbol = formData.symbol.trim();
         baseData.shares = Number(formData.shares) || 0;
         baseData.cost = Number(formData.cost) || 0;
         if (editData && editData.refPrice !== undefined) {
@@ -158,12 +161,28 @@ export default function AssetModal({ onClose, editData }) {
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px', background: '#fff', flex: 1, overflowY: 'auto' }}>
-          <input type="text" name="item" placeholder="項目名稱 (例如: 台積電、薪轉戶)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+          {assetType === 'stock' ? (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input type="text" name="symbol" placeholder="代碼 (如: 2330)" value={formData.symbol} onChange={handleChange} className={errors.includes('symbol') ? 'error-shake' : ''} style={{ width: '140px', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+              <input type="text" name="item" placeholder="名稱 (如: 台積電)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ flex: 1, padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+            </div>
+          ) : (
+            <input type="text" name="item" placeholder="項目名稱 (例如: 薪轉戶、緊急預備金)" value={formData.item} onChange={handleChange} className={errors.includes('item') ? 'error-shake' : ''} style={{ width: '100%', padding: '12px', fontSize: '16px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }} />
+          )}
+          
           {assetType === 'stock' && availableStocks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
-              {availableStocks.map(s => (
-                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
-              ))}
+              {availableStocks.map(s => {
+                return (
+                  <button key={s} onClick={() => {
+                    const match = s.match(/(.*?)(?:\s*[\(（]([A-Za-z0-9.]+)[\)）])?/);
+                    const symMatch = s.match(/[A-Za-z0-9.]+/);
+                    const sym = match && match[2] ? match[2].trim() : (symMatch ? symMatch[0] : '');
+                    const name = match && match[1] ? match[1].trim() : s;
+                    setFormData(prev => ({...prev, item: name, symbol: sym}));
+                  }} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+                );
+              })}
             </div>
           )}
           {assetType === 'demand' && (
