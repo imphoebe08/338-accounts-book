@@ -182,14 +182,13 @@ export default function AssetModal({ onClose, editData }) {
           {assetType === 'stock' && availableStocks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableStocks.map(s => {
+                // 支援舊字串陣列格式與新物件格式
+                const isObj = typeof s === 'object' && s !== null;
+                const sym = isObj ? s.symbol : (s.match(/\(([A-Za-z0-9.]+)\)/) || s.match(/\d{4,}/) || s.match(/[A-Za-z0-9.]+/) || [''])[0].replace(/[()]/g, '');
+                const name = isObj ? s.name : s.replace(/\([A-Za-z0-9.]+\)/, '').replace(/[A-Za-z0-9.]+/g, '').trim();
+
                 return (
-                  <button key={s} onClick={() => {
-                    const match = s.match(/(.*?)(?:\s*[\(（]([A-Za-z0-9.]+)[\)）])?/);
-                    const symMatch = s.match(/[A-Za-z0-9.]+/);
-                    const sym = match && match[2] ? match[2].trim() : (symMatch ? symMatch[0] : '');
-                    const name = match && match[1] ? match[1].trim() : s;
-                    setFormData(prev => ({...prev, item: name, symbol: sym}));
-                  }} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+                  <button key={sym + name} onClick={() => setFormData(prev => ({...prev, item: name, symbol: sym}))} style={{ padding: '8px 16px', background: formData.symbol === sym ? '#D5B77A' : '#EAE3D2', color: formData.symbol === sym ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer', fontWeight: 'bold' }}>{sym}</button>
                 );
               })}
             </div>

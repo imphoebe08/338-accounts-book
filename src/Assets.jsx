@@ -55,88 +55,48 @@ export default function Assets({ assets }) {
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
-      // 1. 收集並過濾出所有需要查詢的股票代碼
-      const symbolMap = {}; 
-      const querySymbols = [];
-      
-      stocks.forEach(stock => {
-        let symbol = stock.symbol?.trim();
-        if (!symbol) {
-          const match = stock.item.match(/\(([A-Za-z0-9.]+)\)/) || stock.item.match(/\d{4,}/) || stock.item.match(/[A-Za-z0-9.]+/);
-          symbol = match ? (match[1] || match[0]) : '';
-        }
-        if (!symbol) return;
-
-        const isTwStock = /^\d{4,5}$/.test(symbol);
-        if (isTwStock) {
-          // 台灣股票：同時查詢上市 (.TW) 與上櫃 (.TWO) 以防錯
-          querySymbols.push(`${symbol}.TW`);
-          querySymbols.push(`${symbol}.TWO`);
-          symbolMap[`${symbol}.TW`] = stock;
-          symbolMap[`${symbol}.TWO`] = stock;
-        } else {
-          // 美股或已自行加上後綴的代碼 (如 AAPL, 0050.TW)
-          querySymbols.push(symbol);
-          symbolMap[symbol] = stock;
-        }
-      });
-
-      if (querySymbols.length === 0) {
-        alert('沒有找到任何有效的股票代碼，請先編輯股票並填入代碼！');
-        setIsFetching(false);
-        return;
-      }
-
-      // 2. 透過 Yahoo 官方 API 整批查詢 (速度極快，一次最多可查數十檔)
-      const batchSize = 20;
       let successCount = 0;
-      const today = new Date().toISOString().split('T')[0];
+      const priceMap = {};
 
-      for (let i = 0; i < querySymbols.length; i += batchSize) {
-        const batch = querySymbols.slice(i, i + batchSize).join(',');
-        const targetUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${batch}`;
-        
-        const proxies = [
-          (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-          (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        ];
-
-        let results = [];
-        for (const getProxy of proxies) {
-          try {
-            // 加上 8 秒超時機制，避免被壞掉的 Proxy 永遠卡死
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000);
-            
-            const res = await fetch(getProxy(targetUrl), { signal: controller.signal });
-            clearTimeout(timeoutId);
-            
-            if (!res.ok) continue;
-            const data = await res.json();
-            results = data?.quoteResponse?.result || [];
-            if (results.length > 0) break; // 成功取得資料，跳出 Proxy 迴圈
-          } catch (e) {
-            console.warn("Proxy 嘗試失敗", e);
-          }
+      // 1. 預先一次性抓取台灣上市與上櫃的今日/昨日收盤價 (無 CORS 限制且極度穩定)
+      try {
+        const twseRes = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+        if (twseRes.ok) {
+          const twseData = await twseRes.json();
+          twseData.forEach(item => {
+            if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice.replace(/,/g, ''));
+          });
         }
-
-        // 3. 將取得的最新價格寫回 Firebase 資料庫
-        for (const quote of results) {
-          const price = quote.regularMarketPrice;
-          const matchedStock = symbolMap[quote.symbol];
-          if (price && matchedStock) {
-            await updateDoc(doc(db, 'assets', matchedStock.id), { refPrice: price, updatedAt: today });
-            successCount++;
-            
-            // 避免同一個 stock id 被重複計算 (例如 .TW 和 .TWO 都回傳的情況)
-            delete symbolMap[quote.symbol];
-            if (quote.symbol.endsWith('.TW')) delete symbolMap[quote.symbol.replace('.TW', '.TWO')];
-            if (quote.symbol.endsWith('.TWO')) delete symbolMap[quote.symbol.replace('.TWO', '.TW')];
-          }
-        }
+      } catch (err) {
+        console.warn("上市 API 抓取失敗", err);
       }
       
-      alert(`股價更新完成！(成功更新 ${successCount} 筆資料)`);
+      try {
+        const tpexRes = await fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
+        if (tpexRes.ok) {
+          const tpexData = await tpexRes.json();
+          tpexData.forEach(item => {
+            if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close.replace(/,/g, ''));
+          });
+        }
+      } catch (err) {
+        console.warn("上櫃 API 抓取失敗", err);
+      }
+      
+      // 2. 將抓到的價格更新到資料庫
+      const today = new Date().toISOString().split('T')[0];
+      await Promise.all(stocks.map(async (stock) => {
+        let symbol = stock.symbol?.trim();
+        if (!symbol) return;
+        
+        let price = priceMap[symbol];
+        if (price && !isNaN(price)) {
+          await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
+          successCount++;
+        }
+      }));
+
+      alert(`股價更新完成！(成功更新 ${successCount} / ${stocks.length} 筆資料)`);
     } catch (e) {
       console.error(e);
       alert('股價更新發生預期外的錯誤！');
