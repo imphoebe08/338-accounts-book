@@ -55,77 +55,25 @@ export default function Assets({ assets }) {
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
-      let successCount = 0;
-      const today = new Date().toISOString().split('T')[0];
+      // 呼叫 Vercel 雲端的 Python Serverless Function
+      const res = await fetch('/api/update_prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
       
-      // Python 爬蟲邏輯：建立透過 CORS Proxy 取得單檔股票 JSON 的共用函式
-      const fetchProxyJSON = async (url) => {
-        try {
-          const res = await fetch(`https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(url)}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.contents) return JSON.parse(data.contents);
-          }
-        } catch (e) {}
-        return null;
-      };
-
-      const now = new Date();
-      // 如果今天是當月1號，保險起見我們抓取上個月的資料以防假日無數據
-      if (now.getDate() === 1) now.setMonth(now.getMonth() - 1);
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const YYYYMMDD = `${yyyy}${mm}${dd}`;
-      const twYearMonth = `${yyyy - 1911}/${mm}`;
-
-      await Promise.all(stocks.map(async (stock) => {
-        let symbol = stock.symbol?.trim();
-        if (!symbol) {
-          const match = stock.item.match(/\(([A-Za-z0-9.]+)\)/) || stock.item.match(/\d{4,}/) || stock.item.match(/[A-Za-z0-9.]+/);
-          symbol = match ? (match[1] || match[0]) : '';
-        }
-        if (!symbol) return;
-        
-        let cleanSymbol = symbol.toUpperCase().replace('.TW', '').replace('.TWO', '');
-        let price = null;
-
-        // 1. 嘗試 Python 爬蟲方式：台灣證交所 (上市)
-        const twseUrl = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${YYYYMMDD}&stockNo=${cleanSymbol}`;
-        const twseData = await fetchProxyJSON(twseUrl);
-        if (twseData && twseData.stat === 'OK' && twseData.data?.length > 0) {
-           const lastDay = twseData.data[twseData.data.length - 1];
-           price = Number(lastDay[6].replace(/,/g, ''));
-        }
-
-        // 2. 嘗試 Python 爬蟲方式：櫃買中心 (上櫃)
-        if (!price) {
-          const tpexUrl = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${twYearMonth}&stk_no=${cleanSymbol}`;
-          const tpexData = await fetchProxyJSON(tpexUrl);
-          if (tpexData && tpexData.aaData?.length > 0) {
-             const lastDay = tpexData.aaData[tpexData.aaData.length - 1];
-             price = Number(lastDay[6].replace(/,/g, ''));
-          }
-        }
-
-        // 3. 若皆無，嘗試 Yahoo Finance (美股/ETF 備用)
-        if (!price) {
-           const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}?interval=1d&range=1d`;
-           const yahooData = await fetchProxyJSON(targetUrl);
-           const quotePrice = yahooData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-           if (quotePrice) price = Number(quotePrice);
-        }
-
-        if (price && !isNaN(price) && price > 0) {
-          await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
-          successCount++;
-        }
-      }));
-
-      alert(`股價更新完成！(成功更新 ${successCount} / ${stocks.length} 筆資料)`);
+      if (!res.ok) {
+        throw new Error('伺服器無回應');
+      }
+      
+      const data = await res.json();
+      if (data.success) {
+        alert(`股價更新完成！(成功更新 ${data.count} 筆資料)`);
+      } else {
+        throw new Error(data.error || '更新失敗');
+      }
     } catch (e) {
       console.error(e);
-      alert('股價更新發生預期外的錯誤！');
+      alert('無法連線到雲端爬蟲伺服器！請確認 Vercel 部署是否成功。');
     } finally {
       setIsFetching(false);
     }
