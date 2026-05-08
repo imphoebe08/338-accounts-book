@@ -6,19 +6,31 @@ from firebase_admin import credentials, firestore
 import urllib.request
 import datetime
 
-# 啟動時檢查是否已經初始化過 Firebase，避免重複執行
+# 啟動時檢查是否已經初始化過 Firebase，並捕捉詳細錯誤
+firebase_err = None
 if not firebase_admin._apps:
     try:
-        # 雲端環境中不能放檔案，改從 Vercel 的環境變數讀取金鑰！
-        service_account_info = json.loads(os.environ.get('FIREBASE_SERVICE_ACCOUNT', '{}'))
+        env_val = os.environ.get('FIREBASE_SERVICE_ACCOUNT')
+        if not env_val:
+            raise Exception("找不到 Vercel 環境變數 FIREBASE_SERVICE_ACCOUNT，請至後台設定！")
+        
+        service_account_info = json.loads(env_val)
+        # 修復 Vercel 環境變數中 private_key 的換行符號可能被跳脫的問題
+        if 'private_key' in service_account_info:
+            service_account_info['private_key'] = service_account_info['private_key'].replace('\\n', '\n')
+            
         cred = credentials.Certificate(service_account_info)
         firebase_admin.initialize_app(cred)
     except Exception as e:
+        firebase_err = str(e)
         print("Firebase 初始化失敗:", e)
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
+            if firebase_err:
+                raise Exception(f"Firebase 設定錯誤: {firebase_err}")
+                
             db = firestore.client()
             assets_ref = db.collection('assets')
             docs = assets_ref.where('type', '==', 'stock').stream()

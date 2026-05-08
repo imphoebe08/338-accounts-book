@@ -65,19 +65,24 @@ export default function Assets({ assets }) {
         headers: { 'Content-Type': 'application/json' }
       });
       
-      if (!res.ok) {
-        throw new Error('伺服器無回應');
-      }
-      
-      const data = await res.json();
-      if (data.success) {
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || `伺服器回應錯誤碼: ${res.status}`);
+        }
         alert(`股價更新完成！(成功更新 ${data.count} 筆資料)`);
       } else {
-        throw new Error(data.error || '更新失敗');
+        const text = await res.text();
+        // 判斷是否為本地手機測試且非 localhost 的情況
+        if (text.includes("<!doctype html>")) {
+          throw new Error("API 路由未生效。請確認您是在 Vercel 的網址上測試，而非本地區域網路 IP。");
+        }
+        throw new Error(`伺服器回傳格式錯誤 (${res.status}): ` + text.substring(0, 100));
       }
     } catch (e) {
       console.error(e);
-      alert('無法連線到雲端爬蟲伺服器！請確認 Vercel 部署是否成功。');
+      alert(`更新失敗: \n${e.message}`);
     } finally {
       setIsFetching(false);
     }
