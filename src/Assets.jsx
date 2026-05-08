@@ -57,44 +57,28 @@ export default function Assets({ assets }) {
     try {
       let successCount = 0;
       const today = new Date().toISOString().split('T')[0];
-      const priceMap = {};
       
-      // 建立透過 CORS Proxy 取得 JSON 的共用函式，避免瀏覽器攔截政府 API
-      const fetchWithProxy = async (url) => {
+      // Python 爬蟲邏輯：建立透過 CORS Proxy 取得單檔股票 JSON 的共用函式
+      const fetchProxyJSON = async (url) => {
         try {
-          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-          if (res.ok) return await res.json();
-        } catch (e) {}
-        try {
-          const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-          if (res.ok) return await res.json();
+          const res = await fetch(`https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(url)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.contents) return JSON.parse(data.contents);
+          }
         } catch (e) {}
         return null;
       };
 
-      // 1. 抓取台灣證交所 (上市) 開放資料
-      const twseData = await fetchWithProxy('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
-      if (twseData && Array.isArray(twseData)) {
-        twseData.forEach(item => {
-          if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice.replace(/,/g, ''));
-        });
-      }
+      const now = new Date();
+      // 如果今天是當月1號，保險起見我們抓取上個月的資料以防假日無數據
+      if (now.getDate() === 1) now.setMonth(now.getMonth() - 1);
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const YYYYMMDD = `${yyyy}${mm}${dd}`;
+      const twYearMonth = `${yyyy - 1911}/${mm}`;
 
-      // 2. 抓取櫃買中心 (上櫃) 開放資料
-      const tpexData = await fetchWithProxy('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
-      if (tpexData && Array.isArray(tpexData)) {
-        tpexData.forEach(item => {
-          if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close.replace(/,/g, ''));
-        });
-      }
-
-      if (Object.keys(priceMap).length === 0) {
-        alert('無法從政府開放平台取得報價資料，請稍後再試！');
-        setIsFetching(false);
-        return;
-      }
-
-      // 3. 比對使用者的股票代碼並更新 Firebase
       await Promise.all(stocks.map(async (stock) => {
         let symbol = stock.symbol?.trim();
         if (!symbol) {
@@ -103,9 +87,34 @@ export default function Assets({ assets }) {
         }
         if (!symbol) return;
         
-        // 過濾掉使用者可能輸入的後綴，只留純代碼比對政府資料
         let cleanSymbol = symbol.toUpperCase().replace('.TW', '').replace('.TWO', '');
-        let price = priceMap[cleanSymbol];
+        let price = null;
+
+        // 1. 嘗試 Python 爬蟲方式：台灣證交所 (上市)
+        const twseUrl = `https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date=${YYYYMMDD}&stockNo=${cleanSymbol}`;
+        const twseData = await fetchProxyJSON(twseUrl);
+        if (twseData && twseData.stat === 'OK' && twseData.data?.length > 0) {
+           const lastDay = twseData.data[twseData.data.length - 1];
+           price = Number(lastDay[6].replace(/,/g, ''));
+        }
+
+        // 2. 嘗試 Python 爬蟲方式：櫃買中心 (上櫃)
+        if (!price) {
+          const tpexUrl = `https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${twYearMonth}&stk_no=${cleanSymbol}`;
+          const tpexData = await fetchProxyJSON(tpexUrl);
+          if (tpexData && tpexData.aaData?.length > 0) {
+             const lastDay = tpexData.aaData[tpexData.aaData.length - 1];
+             price = Number(lastDay[6].replace(/,/g, ''));
+          }
+        }
+
+        // 3. 若皆無，嘗試 Yahoo Finance (美股/ETF 備用)
+        if (!price) {
+           const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}?interval=1d&range=1d`;
+           const yahooData = await fetchProxyJSON(targetUrl);
+           const quotePrice = yahooData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+           if (quotePrice) price = Number(quotePrice);
+        }
 
         if (price && !isNaN(price) && price > 0) {
           await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
