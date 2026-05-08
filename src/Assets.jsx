@@ -51,52 +51,96 @@ export default function Assets({ assets }) {
   const [isFetching, setIsFetching] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
 
-  // 真實串接 Yahoo Finance API 更新收盤價
+  // 真實串接 政府 Open API 與 Yahoo Finance API 更新收盤價
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
       let successCount = 0;
+      
+      // 1. 預先一次性抓取台灣上市與上櫃的今日/昨日收盤價 (無 CORS 限制且極度穩定)
+      const priceMap = {};
+      try {
+        const [twseRes, tpexRes] = await Promise.allSettled([
+          fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'),
+          fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes')
+        ]);
+        
+        if (twseRes.status === 'fulfilled' && twseRes.value.ok) {
+          const twseData = await twseRes.value.json();
+          twseData.forEach(item => {
+            if (item.Code && item.ClosingPrice) priceMap[item.Code] = Number(item.ClosingPrice);
+          });
+        }
+        
+        if (tpexRes.status === 'fulfilled' && tpexRes.value.ok) {
+          const tpexData = await tpexRes.value.json();
+          tpexData.forEach(item => {
+            if (item.SecuritiesCompanyCode && item.Close) priceMap[item.SecuritiesCompanyCode] = Number(item.Close);
+          });
+        }
+      } catch (err) {
+        console.warn("政府 API 抓取失敗，將使用備用方案", err);
+      }
+
       await Promise.all(stocks.map(async (stock) => {
         const match = stock.item.match(/[A-Za-z0-9]+/); // 自動提取股票代號 (支援美股或台灣上櫃)
         if (!match) return;
         
         const symbol = match[0];
-        const suffixes = ['.TW', '.TWO', '']; // 依序嘗試上市、上櫃、無後綴
-        const proxies = [
-          (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-          (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-        ];
+        let price = priceMap[symbol]; // 優先使用政府 API 取得的價格
         
-        let price = null;
-        
-        for (const suffix of suffixes) {
-          if (price) break;
-          // 捨棄壞掉的 API，直接去爬取 Yahoo Finance 報價網頁的 HTML 原始碼！
-          const targetUrl = `https://finance.yahoo.com/quote/${symbol}${suffix}`;
+        // 2. 若政府 API 沒查到 (可能是美股或 ETF)，才使用 Yahoo 備用方案
+        if (!price) {
+          const suffixes = ['.TW', '.TWO', '']; 
+          const proxies = [
+            (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+            (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, // allorigins 改回穩定的 get
+          ];
           
-          for (const getProxy of proxies) {
-            try {
-              const res = await fetch(getProxy(targetUrl));
-              const htmlText = await res.text();
-              // 使用正則表達式，在 HTML 中精準捕捉目前市價
-              const matchPrice = htmlText.match(/data-field="regularMarketPrice"[^>]*value="([\d.]+)"/) || htmlText.match(/"regularMarketPrice":\s*\{\s*"raw":\s*([\d.]+)/);
-              if (matchPrice && matchPrice[1]) {
-                price = Number(matchPrice[1]);
+          for (const suffix of suffixes) {
+            if (price) break;
+            const targetUrl = `https://finance.yahoo.com/quote/${symbol}${suffix}`;
+            
+            for (const getProxy of proxies) {
+              try {
+                const proxyUrl = getProxy(targetUrl);
+                const res = await fetch(proxyUrl);
+                let htmlText = '';
+                
+                if (proxyUrl.includes('allorigins.win/get')) {
+                  const data = await res.json();
+                  htmlText = data.contents;
+                } else {
+                  htmlText = await res.text();
+                }
+                
+                if (!htmlText) continue;
+
+                // 多種正則匹配 Yahoo 網頁的價格
+                const matchPrice = htmlText.match(/data-field="regularMarketPrice"[^>]*value="([\d.]+)"/) || 
+                                   htmlText.match(/"regularMarketPrice":\s*\{\s*"raw":\s*([\d.]+)/) ||
+                                   htmlText.match(/<fin-streamer[^>]*data-symbol="[^"]*"[^>]*data-field="regularMarketPrice"[^>]*>([\d.,]+)<\/fin-streamer>/);
+                if (matchPrice && matchPrice[1]) {
+                  price = Number(matchPrice[1].replace(/,/g, ''));
+                }
+                if (price) break; 
+              } catch (e) {
+                // 忽略錯誤，換下一個 proxy
               }
-              if (price) break; // 成功抓到價格，跳出 proxy 迴圈
-            } catch (e) {
-              // 失敗則繼續嘗試下一個 proxy
             }
           }
         }
 
-        if (price) {
+        if (price && !isNaN(price)) {
           const today = new Date().toISOString().split('T')[0];
           await updateDoc(doc(db, 'assets', stock.id), { refPrice: price, updatedAt: today });
           successCount++;
         }
       }));
       alert(`股價更新完成！(成功更新 ${successCount} / ${stocks.length} 筆)`);
+    } catch (e) {
+      console.error(e);
+      alert('股價更新發生預期外的錯誤！');
     } finally {
       setIsFetching(false);
     }
@@ -155,15 +199,24 @@ export default function Assets({ assets }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(213, 183, 122, 0.3)', paddingTop: '15px' }}>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>股票市值</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>${Math.round(totalStockValue).toLocaleString()}</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>
+              ${Math.round(totalStockValue).toLocaleString()}
+              <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px', fontWeight: 'normal' }}>({grandTotal > 0 ? ((totalStockValue / grandTotal) * 100).toFixed(1) : 0}%)</span>
+            </div>
           </div>
           <div style={{ textAlign: 'center', flex: 1, borderLeft: '1px solid rgba(213, 183, 122, 0.3)', borderRight: '1px solid rgba(213, 183, 122, 0.3)' }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>活期存款</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#10b981' }}>${Math.round(totalDemandValue).toLocaleString()}</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#10b981' }}>
+              ${Math.round(totalDemandValue).toLocaleString()}
+              <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px', fontWeight: 'normal' }}>({grandTotal > 0 ? ((totalDemandValue / grandTotal) * 100).toFixed(1) : 0}%)</span>
+            </div>
           </div>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>定期存款</div>
-            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>${Math.round(totalFixedValue).toLocaleString()}</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>
+              ${Math.round(totalFixedValue).toLocaleString()}
+              <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px', fontWeight: 'normal' }}>({grandTotal > 0 ? ((totalFixedValue / grandTotal) * 100).toFixed(1) : 0}%)</span>
+            </div>
           </div>
         </div>
       </div>
