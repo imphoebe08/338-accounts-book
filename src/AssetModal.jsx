@@ -3,6 +3,9 @@ import { doc, onSnapshot, collection, addDoc, updateDoc } from 'firebase/firesto
 import { db } from './firebase';
 import { STOCKS, BANKS, PAYERS } from './config';
 
+const DEMAND_SHORTCUTS = ['薪轉戶', '一般活存', '數位帳戶', '證券交割戶'];
+const FIXED_SHORTCUTS = ['一般定存', '優利定存', '專案定存', '外幣定存'];
+
 export default function AssetModal({ onClose, editData }) {
   const [assetType, setAssetType] = useState(editData?.type || 'stock'); // 'stock', 'demand', 'fixed'
   const [formData, setFormData] = useState({
@@ -155,6 +158,20 @@ export default function AssetModal({ onClose, editData }) {
           {assetType === 'stock' && availableStocks.length > 0 && (
             <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
               {availableStocks.map(s => (
+                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+              ))}
+            </div>
+          )}
+          {assetType === 'demand' && (
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
+              {DEMAND_SHORTCUTS.map(s => (
+                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+              ))}
+            </div>
+          )}
+          {assetType === 'fixed' && (
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
+              {FIXED_SHORTCUTS.map(s => (
                 <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
               ))}
             </div>

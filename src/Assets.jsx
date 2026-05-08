@@ -4,9 +4,14 @@ import { db } from './firebase';
 import AssetModal from './AssetModal';
 
 export default function Assets({ assets }) {
-  const stocks = assets.filter(d => d.type === 'stock');
-  const demandList = assets.filter(d => d.type === 'demand');
-  const fixedList = assets.filter(d => d.type === 'fixed');
+  // 動態整理出所有持有人，並加入「全部」標籤
+  const allHolders = ['全部', ...Array.from(new Set(assets.map(a => a.holder || a.depositor).filter(Boolean)))];
+  const [selectedHolder, setSelectedHolder] = useState('全部');
+
+  const filteredAssets = selectedHolder === '全部' ? assets : assets.filter(a => (a.holder || a.depositor) === selectedHolder);
+  const stocks = filteredAssets.filter(d => d.type === 'stock');
+  const demandList = filteredAssets.filter(d => d.type === 'demand');
+  const fixedList = filteredAssets.filter(d => d.type === 'fixed');
 
   const [isFetching, setIsFetching] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
@@ -17,27 +22,33 @@ export default function Assets({ assets }) {
     try {
       let successCount = 0;
       await Promise.all(stocks.map(async (stock) => {
-        const match = stock.item.match(/\d{4}/); // 自動提取四位數股票代號
+        const match = stock.item.match(/[A-Za-z0-9]+/); // 自動提取股票代號 (支援美股或台灣上櫃)
         if (!match) return;
         
         const symbol = match[0];
-        const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.TW?interval=1d`;
+        const suffixes = ['.TW', '.TWO', '']; // 依序嘗試上市、上櫃、無後綴
+        const proxies = [
+          (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+          (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+          (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+        ];
         
         let price = null;
         
-        try {
-          // 嘗試來源一: corsproxy.io (不帶多餘 wrapper，較穩定)
-          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-          const data = await res.json();
-          price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        } catch (e) {
-          // 嘗試來源二: allorigins raw 端點備援
-          try {
-            const res2 = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-            const data2 = await res2.json();
-            price = data2?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          } catch (err2) {
-            console.error(`抓取 ${symbol} 失敗:`, err2);
+        for (const suffix of suffixes) {
+          if (price) break;
+          const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}${suffix}?interval=1d`;
+          
+          for (const getProxy of proxies) {
+            try {
+              const res = await fetch(getProxy(targetUrl));
+              if (!res.ok) continue;
+              const data = await res.json();
+              price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              if (price) break; // 成功抓到價格，跳出 proxy 迴圈
+            } catch (e) {
+              // 失敗則繼續嘗試下一個 proxy
+            }
           }
         }
 
@@ -47,7 +58,7 @@ export default function Assets({ assets }) {
           successCount++;
         }
       }));
-      alert(`股價更新完成！(成功更新 ${successCount} 筆)\n（註：若仍有失敗項目，可能是 Proxy 不穩定）`);
+      alert(`股價更新完成！(成功更新 ${successCount} / ${stocks.length} 筆)`);
     } finally {
       setIsFetching(false);
     }
@@ -73,9 +84,24 @@ export default function Assets({ assets }) {
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>財產清單</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h2 style={{ margin: 0 }}>財產清單</h2>
       </div>
+
+      {/* 持有人分頁標籤 */}
+      {allHolders.length > 1 && (
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', marginBottom: '20px', paddingBottom: '5px' }}>
+          {allHolders.map(h => (
+            <button 
+              key={h} 
+              onClick={() => setSelectedHolder(h)}
+              style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: selectedHolder === h ? '#D5B77A' : '#EAE3D2', color: selectedHolder === h ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer', fontWeight: selectedHolder === h ? 'bold' : 'normal' }}
+            >
+              {h}
+            </button>
+          ))}
+        </div>
+      )}
 
       <Section title="📈 股票清單" action={<button onClick={handleFetchPrices} disabled={isFetching} style={{ padding: '8px 16px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(213, 183, 122, 0.3)' }}>{isFetching ? '抓取中...' : '更新今日收盤價'}</button>}>
         <div className="card-grid">
@@ -197,7 +223,7 @@ export default function Assets({ assets }) {
 
 // 共用排版元件
 function Section({ title, action, children }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
     <div style={{ marginBottom: '30px' }}>
