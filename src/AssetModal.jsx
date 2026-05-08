@@ -56,13 +56,17 @@ export default function AssetModal({ onClose, editData }) {
   const handleTouchStart = (e) => {
     let target = e.target;
     let shouldIgnoreDrag = false;
-    // 檢查點擊位置是否在一個已經有捲動進度的區塊內，避免把拖曳和捲動衝突
-    while (target && target !== e.currentTarget) {
-      if (target.scrollHeight > target.clientHeight && target.scrollTop > 0) {
-        shouldIgnoreDrag = true;
-        break;
+    // 若點擊的是輸入框、按鈕等互動元素，直接忽略下拉手勢，確保原生 UI (如日曆) 正常觸發
+    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(target.tagName)) {
+      shouldIgnoreDrag = true;
+    } else {
+      while (target && target !== e.currentTarget) {
+        if (target.scrollHeight > target.clientHeight && target.scrollTop > 0) {
+          shouldIgnoreDrag = true;
+          break;
+        }
+        target = target.parentNode;
       }
-      target = target.parentNode;
     }
     setStartY(shouldIgnoreDrag ? null : e.touches[0].clientY);
   };
@@ -147,9 +151,9 @@ export default function AssetModal({ onClose, editData }) {
           <div style={{ width: '40px', height: '5px', background: '#D5B77A', borderRadius: '4px', opacity: 0.5 }}></div>
         </div>
         <div style={{ display: 'flex', borderBottom: '1px solid #ddd' }}>
-          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => { setAssetType('stock'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>股票</button>
-          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => { setAssetType('demand'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>活期存款</button>
-          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => { setAssetType('fixed'); setFormData({item: '', shares: '', cost: '', bank: '', holder: '', amount: '', fixedType: '整存整付', interestRate: '', startDate: '', endDate: '', durationMonths: '', renewalCount: ''}); }}>定期存款</button>
+          <button className={`tab-btn ${assetType === 'stock' ? 'active' : ''}`} onClick={() => setAssetType('stock')}>股票</button>
+          <button className={`tab-btn ${assetType === 'demand' ? 'active' : ''}`} onClick={() => setAssetType('demand')}>活期存款</button>
+          <button className={`tab-btn ${assetType === 'fixed' ? 'active' : ''}`} onClick={() => setAssetType('fixed')}>定期存款</button>
         </div>
         
         {/* 將表單內容區塊加上 flex: 1 與 overflowY: auto，確保視窗不過高時仍可向下捲動 */}
@@ -163,16 +167,16 @@ export default function AssetModal({ onClose, editData }) {
             </div>
           )}
           {assetType === 'demand' && (
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '5px' }}>
               {DEMAND_SHORTCUTS.map(s => (
-                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
               ))}
             </div>
           )}
           {assetType === 'fixed' && (
-            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '5px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '5px' }}>
               {FIXED_SHORTCUTS.map(s => (
-                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ whiteSpace: 'nowrap', padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
+                <button key={s} onClick={() => setFormData(prev => ({...prev, item: s}))} style={{ padding: '8px 16px', background: formData.item === s ? '#D5B77A' : '#EAE3D2', color: formData.item === s ? '#fff' : '#5C5446', border: 'none', borderRadius: '24px', fontSize: '14px', cursor: 'pointer' }}>{s}</button>
               ))}
             </div>
           )}

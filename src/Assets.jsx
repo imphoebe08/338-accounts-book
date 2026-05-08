@@ -4,14 +4,49 @@ import { db } from './firebase';
 import AssetModal from './AssetModal';
 
 export default function Assets({ assets }) {
+  const [sortOrder, setSortOrder] = useState('valueDesc'); // 'valueDesc', 'valueAsc', 'name'
   // 動態整理出所有持有人，並加入「全部」標籤
   const allHolders = ['全部', ...Array.from(new Set(assets.map(a => a.holder || a.depositor).filter(Boolean)))];
   const [selectedHolder, setSelectedHolder] = useState('全部');
 
   const filteredAssets = selectedHolder === '全部' ? assets : assets.filter(a => (a.holder || a.depositor) === selectedHolder);
-  const stocks = filteredAssets.filter(d => d.type === 'stock');
-  const demandList = filteredAssets.filter(d => d.type === 'demand');
-  const fixedList = filteredAssets.filter(d => d.type === 'fixed');
+  
+  // 共用的定存本金計算邏輯
+  const getFixedPrincipal = (dep) => {
+    let principal = Number(dep.amount) || 0;
+    let m = Number(dep.durationMonths) || 0;
+    if (!m && dep.startDate && dep.endDate) {
+      const s = new Date(dep.startDate);
+      const e = new Date(dep.endDate);
+      m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+    }
+    if (dep.fixedType === '零存整付' && m) {
+      const renewals = Number(dep.renewalCount) || 0;
+      principal = principal * (m * (1 + renewals));
+    }
+    return principal;
+  };
+
+  // 取得計算後價值的排序函式
+  const sortAssets = (list, type) => {
+    return [...list].sort((a, b) => {
+      let valA = type === 'stock' ? (a.shares * (a.refPrice || a.cost)) : (type === 'demand' ? Number(a.amount) : getFixedPrincipal(a));
+      let valB = type === 'stock' ? (b.shares * (b.refPrice || b.cost)) : (type === 'demand' ? Number(b.amount) : getFixedPrincipal(b));
+      if (sortOrder === 'valueDesc') return valB - valA;
+      if (sortOrder === 'valueAsc') return valA - valB;
+      return a.item.localeCompare(b.item);
+    });
+  };
+
+  const stocks = sortAssets(filteredAssets.filter(d => d.type === 'stock'), 'stock');
+  const demandList = sortAssets(filteredAssets.filter(d => d.type === 'demand'), 'demand');
+  const fixedList = sortAssets(filteredAssets.filter(d => d.type === 'fixed'), 'fixed');
+
+  // 計算上方總計看板的數據
+  const totalStockValue = stocks.reduce((sum, s) => sum + ((s.shares || 0) * (s.refPrice || s.cost || 0)), 0);
+  const totalDemandValue = demandList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalFixedValue = fixedList.reduce((sum, d) => sum + getFixedPrincipal(d), 0);
+  const grandTotal = totalStockValue + totalDemandValue + totalFixedValue;
 
   const [isFetching, setIsFetching] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
@@ -30,21 +65,24 @@ export default function Assets({ assets }) {
         const proxies = [
           (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
           (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-          (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
         ];
         
         let price = null;
         
         for (const suffix of suffixes) {
           if (price) break;
-          const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}${suffix}?interval=1d`;
+          // 捨棄壞掉的 API，直接去爬取 Yahoo Finance 報價網頁的 HTML 原始碼！
+          const targetUrl = `https://finance.yahoo.com/quote/${symbol}${suffix}`;
           
           for (const getProxy of proxies) {
             try {
               const res = await fetch(getProxy(targetUrl));
-              if (!res.ok) continue;
-              const data = await res.json();
-              price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              const htmlText = await res.text();
+              // 使用正則表達式，在 HTML 中精準捕捉目前市價
+              const matchPrice = htmlText.match(/data-field="regularMarketPrice"[^>]*value="([\d.]+)"/) || htmlText.match(/"regularMarketPrice":\s*\{\s*"raw":\s*([\d.]+)/);
+              if (matchPrice && matchPrice[1]) {
+                price = Number(matchPrice[1]);
+              }
               if (price) break; // 成功抓到價格，跳出 proxy 迴圈
             } catch (e) {
               // 失敗則繼續嘗試下一個 proxy
@@ -86,6 +124,11 @@ export default function Assets({ assets }) {
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
         <h2 style={{ margin: 0 }}>財產清單</h2>
+        <select value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ padding: '6px 12px', borderRadius: '16px', border: '1px solid #EAE3D2', color: '#5C5446', fontSize: '13px', background: '#fff', outline: 'none' }}>
+          <option value="valueDesc">金額：高 ➔ 低</option>
+          <option value="valueAsc">金額：低 ➔ 高</option>
+          <option value="name">依名稱排序</option>
+        </select>
       </div>
 
       {/* 持有人分頁標籤 */}
@@ -102,6 +145,28 @@ export default function Assets({ assets }) {
           ))}
         </div>
       )}
+
+      {/* 總計看板 */}
+      <div className="card" style={{ marginBottom: '30px', padding: '20px', background: 'linear-gradient(135deg, #F8F6F0 0%, #EAE3D2 100%)', border: '1px solid #D5B77A' }}>
+        <div style={{ textAlign: 'center', marginBottom: '15px' }}>
+          <div style={{ fontSize: '14px', color: '#7A6F5D' }}>{selectedHolder} 總資產</div>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#333' }}>${Math.round(grandTotal).toLocaleString()}</div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(213, 183, 122, 0.3)', paddingTop: '15px' }}>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <div style={{ fontSize: '12px', color: '#7A6F5D' }}>股票市值</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>${Math.round(totalStockValue).toLocaleString()}</div>
+          </div>
+          <div style={{ textAlign: 'center', flex: 1, borderLeft: '1px solid rgba(213, 183, 122, 0.3)', borderRight: '1px solid rgba(213, 183, 122, 0.3)' }}>
+            <div style={{ fontSize: '12px', color: '#7A6F5D' }}>活期存款</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#10b981' }}>${Math.round(totalDemandValue).toLocaleString()}</div>
+          </div>
+          <div style={{ textAlign: 'center', flex: 1 }}>
+            <div style={{ fontSize: '12px', color: '#7A6F5D' }}>定期存款</div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>${Math.round(totalFixedValue).toLocaleString()}</div>
+          </div>
+        </div>
+      </div>
 
       <Section title="📈 股票清單" action={<button onClick={handleFetchPrices} disabled={isFetching} style={{ padding: '8px 16px', background: '#D5B77A', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(213, 183, 122, 0.3)' }}>{isFetching ? '抓取中...' : '更新今日收盤價'}</button>}>
         <div className="card-grid">

@@ -60,6 +60,10 @@ export default function Analysis({ transactions, assets }) {
   const [compTxType, setCompTxType] = useState(''); // 預設為所有收支
   const [compPayer, setCompPayer] = useState('');
 
+  // 財產持有人篩選條件
+  const [assetFilterHolder, setAssetFilterHolder] = useState('');
+  const allAssetHolders = useMemo(() => Array.from(new Set(assets.map(a => a.holder || a.depositor).filter(Boolean))), [assets]);
+
   const [showLegend, setShowLegend] = useState(false);
   // 表格呈現條件
   const [compareCondition, setCompareCondition] = useState('expense_ratio'); // 'expense_ratio', 'income_expense'
@@ -179,7 +183,8 @@ export default function Analysis({ transactions, assets }) {
       '活期存款': { value: 0, items: new Set() }, 
       '定期存款': { value: 0, items: new Set() } 
     };
-    assets.forEach(asset => {
+    const filteredAssetsForChart = assetFilterHolder ? assets.filter(a => (a.holder || a.depositor) === assetFilterHolder) : assets;
+    filteredAssetsForChart.forEach(asset => {
       if (asset.type === 'stock') {
         assetDataMap['股票'].value += (Number(asset.shares) * Number(asset.cost)) || 0;
         if (asset.item) assetDataMap['股票'].items.add(asset.item);
@@ -196,7 +201,7 @@ export default function Analysis({ transactions, assets }) {
       }
     });
     return Object.entries(assetDataMap).filter(([_, data]) => data.value > 0).map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) }));
-  }, [assets]);
+  }, [assets, assetFilterHolder]);
 
   // 計算圖例比例 (分開處理主條件與比較條件)
   const totalPrimary = yearlySummaryData.reduce((sum, d) => sum + d.value, 0);
@@ -480,7 +485,13 @@ export default function Analysis({ transactions, assets }) {
 
       {tab === 'assets' && (
         <div className="card" style={{ marginBottom: '20px' }}>
-          <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333', textAlign: 'center' }}>財產佔比分析</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>財產佔比分析</h3>
+            <select value={assetFilterHolder} onChange={e => setAssetFilterHolder(e.target.value)} style={selectStyle}>
+              <option value="">所有持有人</option>
+              {allAssetHolders.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
           {dynamicAssetData.length === 0 ? (
             <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>尚無財產紀錄</div>
           ) : (
