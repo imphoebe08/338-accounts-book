@@ -394,22 +394,26 @@ function ManageList({ items = [], onUpdate, label, color }) {
   const handleAdd = () => {
     const newItem = prompt(`請輸入新的${label}：`);
     if (newItem && newItem.trim()) {
-      onUpdate([...items, newItem.trim()]);
+      // 使用 Set 自動過濾重複項目
+      onUpdate(Array.from(new Set([...items, newItem.trim()])));
     }
   };
 
   const handleEdit = (index) => {
-    const newValue = prompt(`請編輯${label}：`, items[index]);
-    if (newValue && newValue.trim() && newValue !== items[index]) {
+    const oldValue = items[index];
+    const newValue = prompt(`請編輯${label}：`, oldValue);
+    if (newValue && newValue.trim() && newValue !== oldValue) {
+      const trimmedNew = newValue.trim();
       const newList = [...items];
-      newList[index] = newValue.trim();
-      onUpdate(newList);
+      newList[index] = trimmedNew;
+      onUpdate(Array.from(new Set(newList)), oldValue, trimmedNew);
     }
   };
 
   const handleDelete = (index) => {
-    if (window.confirm(`確定要刪除「${items[index]}」嗎？`)) {
-      onUpdate(items.filter((_, i) => i !== index));
+    const oldValue = items[index];
+    if (window.confirm(`確定要刪除「${oldValue}」嗎？`)) {
+      onUpdate(items.filter((_, i) => i !== index), oldValue, null);
     }
   };
 
