@@ -39,6 +39,7 @@ export default function Overview({ transactions }) {
   const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
   const [showLegend, setShowLegend] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [pieType, setPieType] = useState('expense'); // 'expense' 或 'income'
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
@@ -88,10 +89,10 @@ export default function Overview({ transactions }) {
     totalExpense: filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
   }), [filteredTransactions]);
 
-  // 動態計算當月支出的圓餅圖資料
+  // 動態計算當月收支的圓餅圖資料
   const pieData = useMemo(() => {
     const grouped = filteredTransactions
-      .filter(t => t.type === 'expense')
+      .filter(t => t.type === pieType)
       .reduce((acc, tx) => {
         if (!acc[tx.category]) acc[tx.category] = { value: 0, items: new Set() };
         acc[tx.category].value += tx.amount;
@@ -102,11 +103,11 @@ export default function Overview({ transactions }) {
     return Object.entries(grouped)
       .map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) }))
       .sort((a, b) => b.value - a.value);
-  }, [filteredTransactions]); // 依金額由大到小排序
+  }, [filteredTransactions, pieType]); // 依金額由大到小排序
 
   // 根據點擊的圓餅圖色塊與搜尋關鍵字篩選顯示的項目
   const displayedTransactions = (selectedCategory 
-    ? filteredTransactions.filter(t => t.category === selectedCategory && t.type === 'expense')
+    ? filteredTransactions.filter(t => t.category === selectedCategory && t.type === pieType)
     : filteredTransactions).filter(tx => {
       if (!searchKeyword.trim()) return true;
       const keyword = searchKeyword.toLowerCase();
@@ -195,15 +196,18 @@ export default function Overview({ transactions }) {
 
       {/* 動態圓餅圖 */}
       <div className="card" style={{ marginBottom: '20px' }}>
-        <h3 style={{ marginTop: 0, fontSize: '16px', color: '#333', textAlign: 'center' }}>{viewMode === 'month' ? '本月' : '本年'}支出佔比</h3>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '15px', borderBottom: '1px solid #eee' }}>
+          <h3 onClick={() => { setPieType('expense'); setSelectedCategory(null); }} style={{ margin: 0, paddingBottom: '10px', fontSize: '16px', cursor: 'pointer', color: pieType === 'expense' ? '#ef4444' : '#999', borderBottom: pieType === 'expense' ? '3px solid #ef4444' : '3px solid transparent', transition: 'all 0.2s' }}>{viewMode === 'month' ? '本月' : '本年'}支出佔比</h3>
+          <h3 onClick={() => { setPieType('income'); setSelectedCategory(null); }} style={{ margin: 0, paddingBottom: '10px', fontSize: '16px', cursor: 'pointer', color: pieType === 'income' ? '#10b981' : '#999', borderBottom: pieType === 'income' ? '3px solid #10b981' : '3px solid transparent', transition: 'all 0.2s' }}>{viewMode === 'month' ? '本月' : '本年'}收入佔比</h3>
+        </div>
         {pieData.length === 0 ? (
-          <div style={{ display: 'flex', height: '300px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無支出紀錄</div>
+          <div style={{ display: 'flex', height: '285px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>{viewMode === 'month' ? '本月' : '本年'}尚無{pieType === 'expense' ? '支出' : '收入'}紀錄</div>
         ) : (
           <>
             <div style={{ position: 'relative', width: '100%', height: '320px' }}>
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
-                <div style={{ fontSize: '12px', color: '#999' }}>結餘</div>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#333' }}>${(totalIncome - totalExpense).toLocaleString()}</div>
+                <div style={{ fontSize: '12px', color: '#999' }}>{pieType === 'expense' ? '總支出' : '總收入'}</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: pieType === 'expense' ? '#ef4444' : '#10b981' }}>${(pieType === 'expense' ? totalExpense : totalIncome).toLocaleString()}</div>
               </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
