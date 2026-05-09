@@ -1,7 +1,7 @@
 // 設定與資料管理頁面
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
-import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy, where, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export default function Settings() {
@@ -44,6 +44,78 @@ export default function Settings() {
   // 更新資料回 Firebase
   const updateSetting = async (key, newList) => {
     await setDoc(doc(db, 'settings', 'user_prefs'), { [key]: newList }, { merge: true });
+  };
+
+  // 處理分類更名與合併歷史紀錄
+  const handleCategoryUpdate = async (key, newList, oldValue, newValue) => {
+    await updateSetting(key, newList);
+    
+    if (oldValue && newValue && oldValue !== newValue) {
+      if (window.confirm(`💡 偵測到分類名稱變更！\n\n是否要將所有歷史紀錄中的「${oldValue}」一併自動更改為「${newValue}」？\n(這能幫助您整合有 Emoji 與沒有 Emoji 的分類)`)) {
+        try {
+          const q = query(collection(db, "transactions"), where("category", "==", oldValue));
+          const snapshot = await getDocs(q);
+          if (!snapshot.empty) {
+            const updates = [];
+            snapshot.forEach(docSnap => {
+              updates.push(updateDoc(doc(db, "transactions", docSnap.id), { category: newValue }));
+            });
+            await Promise.all(updates);
+            alert(`✅ 成功統整！已將 ${updates.length} 筆歷史紀錄更新為「${newValue}」！`);
+          }
+        } catch (e) {
+          console.error(e);
+          alert("更新歷史紀錄失敗！");
+        }
+      }
+    }
+  };
+
+  // 自動從歷史紀錄補齊缺少的設定
+  const handleSyncFromHistory = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "transactions"));
+      if (snapshot.empty) {
+        alert('目前沒有歷史紀錄！');
+        return;
+      }
+
+      const newExpCats = new Set(expenseCats);
+      const newIncCats = new Set(incomeCats);
+      const newPayerSet = new Set(payers);
+      let updated = false;
+
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        if (d.category && d.category !== '其他') {
+          if (d.type === 'expense' && !newExpCats.has(d.category)) {
+            newExpCats.add(d.category);
+            updated = true;
+          } else if (d.type === 'income' && !newIncCats.has(d.category)) {
+            newIncCats.add(d.category);
+            updated = true;
+          }
+        }
+        if (d.payer && !newPayerSet.has(d.payer)) {
+          newPayerSet.add(d.payer);
+          updated = true;
+        }
+      });
+
+      if (updated) {
+        await setDoc(doc(db, 'settings', 'user_prefs'), {
+          expenseCats: Array.from(newExpCats),
+          incomeCats: Array.from(newIncCats),
+          payers: Array.from(newPayerSet)
+        }, { merge: true });
+        alert('✅ 掃描完成！已為您自動補齊缺少的分類與付款人。\n您現在可以透過上方的管理清單重新命名或合併它們了！');
+      } else {
+        alert('目前設定已是最新，歷史紀錄中沒有缺少的分類或付款人！');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('掃描失敗，請稍後再試！');
+    }
   };
 
   // 下載 CSV 工具函式
@@ -268,7 +340,7 @@ export default function Settings() {
       
       <CollapsibleCard title="支出設定" titleColor="#ef4444">
         <h4 style={{ color: '#333', fontSize: '15px' }}>分類管理</h4>
-        <ManageList items={expenseCats} onUpdate={(list) => updateSetting('expenseCats', list)} label="支出分類" color="#ef4444" />
+        <ManageList items={expenseCats} onUpdate={(list, oldV, newV) => handleCategoryUpdate('expenseCats', list, oldV, newV)} label="支出分類" color="#ef4444" />
         
         <h4 style={{ color: '#333', fontSize: '15px' }}>快捷輸入管理</h4>
         <ManageList items={expenseShorts} onUpdate={(list) => updateSetting('expenseShorts', list)} label="支出快捷" color="#ef4444" />
@@ -276,13 +348,21 @@ export default function Settings() {
 
       <CollapsibleCard title="收入設定" titleColor="#10b981">
         <h4 style={{ color: '#333', fontSize: '15px' }}>分類管理</h4>
-        <ManageList items={incomeCats} onUpdate={(list) => updateSetting('incomeCats', list)} label="收入分類" color="#10b981" />
+        <ManageList items={incomeCats} onUpdate={(list, oldV, newV) => handleCategoryUpdate('incomeCats', list, oldV, newV)} label="收入分類" color="#10b981" />
 
         <h4 style={{ color: '#333', fontSize: '15px' }}>快捷輸入管理</h4>
         <ManageList items={incomeShorts} onUpdate={(list) => updateSetting('incomeShorts', list)} label="收入快捷" color="#10b981" />
       </CollapsibleCard>
 
       <CollapsibleCard title="其他管理" titleColor="#3b82f6">
+        <div style={{ marginBottom: '25px', padding: '15px', background: '#F0F4FF', borderRadius: '16px', border: '1px solid #BFDBFE' }}>
+          <div style={{ fontSize: '14px', color: '#3b82f6', fontWeight: 'bold', marginBottom: '8px' }}>自動同步歷史設定</div>
+          <p style={{ fontSize: '12px', color: '#666', margin: '0 0 10px 0' }}>若有匯入舊資料導致分類未顯示，點擊下方按鈕將自動從紀錄中找出並加回清單。</p>
+          <button onClick={handleSyncFromHistory} style={{ width: '100%', padding: '10px', background: '#fff', border: '1px dashed #3b82f6', color: '#3b82f6', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+            🔄 掃描並補齊缺少的分類 / 付款人
+          </button>
+        </div>
+
         <h4 style={{ color: '#333', fontSize: '15px' }}>付款/存款/持有人設定</h4>
         <ManageList items={payers} onUpdate={(list) => updateSetting('payers', list)} label="付款/存款/持有人" color="#3b82f6" />
 
@@ -394,26 +474,22 @@ function ManageList({ items = [], onUpdate, label, color }) {
   const handleAdd = () => {
     const newItem = prompt(`請輸入新的${label}：`);
     if (newItem && newItem.trim()) {
-      // 使用 Set 自動過濾重複項目
-      onUpdate(Array.from(new Set([...items, newItem.trim()])));
+      onUpdate([...items, newItem.trim()]);
     }
   };
 
   const handleEdit = (index) => {
-    const oldValue = items[index];
-    const newValue = prompt(`請編輯${label}：`, oldValue);
-    if (newValue && newValue.trim() && newValue !== oldValue) {
-      const trimmedNew = newValue.trim();
+    const newValue = prompt(`請編輯${label}：`, items[index]);
+    if (newValue && newValue.trim() && newValue !== items[index]) {
       const newList = [...items];
-      newList[index] = trimmedNew;
-      onUpdate(Array.from(new Set(newList)), oldValue, trimmedNew);
+      newList[index] = newValue.trim();
+      onUpdate(newList);
     }
   };
 
   const handleDelete = (index) => {
-    const oldValue = items[index];
-    if (window.confirm(`確定要刪除「${oldValue}」嗎？`)) {
-      onUpdate(items.filter((_, i) => i !== index), oldValue, null);
+    if (window.confirm(`確定要刪除「${items[index]}」嗎？`)) {
+      onUpdate(items.filter((_, i) => i !== index));
     }
   };
 
