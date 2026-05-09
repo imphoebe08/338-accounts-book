@@ -1,7 +1,7 @@
 // 設定與資料管理頁面
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
-import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy, where, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export default function Settings() {
@@ -16,6 +16,10 @@ export default function Settings() {
   // 匯出 CSV 用的日期範圍
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
+
+  // 掃描重複資料的狀態
+  const [duplicateGroups, setDuplicateGroups] = useState(null);
+  const [isScanningDuplicates, setIsScanningDuplicates] = useState(false);
 
   // 載入 Firebase 設定資料
   useEffect(() => {
@@ -115,6 +119,48 @@ export default function Settings() {
     } catch (e) {
       console.error(e);
       alert('掃描失敗，請稍後再試！');
+    }
+  };
+
+  // 掃描可疑重複資料
+  const handleScanDuplicates = async () => {
+    setIsScanningDuplicates(true);
+    try {
+      const snapshot = await getDocs(collection(db, "transactions"));
+      const groups = {};
+      
+      // 以「日期 + 金額 + 類型」作為可能重複的判斷依據
+      snapshot.forEach(docSnap => {
+        const d = docSnap.data();
+        const key = `${d.date}_${d.amount}_${d.type}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push({ id: docSnap.id, ...d });
+      });
+
+      // 找出超過一筆以上的群組
+      const duplicates = Object.values(groups).filter(g => g.length > 1);
+      setDuplicateGroups(duplicates);
+
+      if (duplicates.length === 0) {
+        alert('太棒了！沒有發現任何可疑的重複資料。');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('掃描失敗，請稍後再試！');
+    } finally {
+      setIsScanningDuplicates(false);
+    }
+  };
+
+  // 刪除指定的重複項目
+  const handleDeleteDuplicate = async (id, groupIndex) => {
+    if (window.confirm('確定要刪除這筆重複的資料嗎？')) {
+      await deleteDoc(doc(db, "transactions", id));
+      const newGroups = [...duplicateGroups];
+      newGroups[groupIndex] = newGroups[groupIndex].filter(item => item.id !== id);
+      // 若刪除後該群組只剩一筆，代表不重複了，將整個群組移除
+      if (newGroups[groupIndex].length <= 1) newGroups.splice(groupIndex, 1);
+      setDuplicateGroups(newGroups);
     }
   };
 
@@ -407,6 +453,44 @@ export default function Settings() {
           <button onClick={() => handleExportCSV('transactions')} style={{ flex: 1, padding: '12px', background: '#fff', border: '2px solid #f59e0b', color: '#f59e0b', borderRadius: '16px', cursor: 'pointer', fontWeight: 'bold' }}>📥 匯出收支紀錄</button>
           <button onClick={() => handleExportCSV('assets')} style={{ flex: 1, padding: '12px', background: '#fff', border: '2px solid #3b82f6', color: '#3b82f6', borderRadius: '16px', cursor: 'pointer', fontWeight: 'bold' }}>📥 匯出財產清單</button>
         </div>
+      </CollapsibleCard>
+
+      <CollapsibleCard title="資料清理" titleColor="#ec4899">
+        <div style={{ marginBottom: '25px', padding: '15px', background: '#FDF2F8', borderRadius: '16px', border: '1px solid #FBCFE8' }}>
+          <div style={{ fontSize: '14px', color: '#ec4899', fontWeight: 'bold', marginBottom: '8px' }}>重複資料掃描</div>
+          <p style={{ fontSize: '12px', color: '#666', margin: '0 0 10px 0' }}>掃描歷史紀錄，找出「日期、金額、收支類型」完全相同的可疑重複項目，方便您檢查與刪除。</p>
+          <button onClick={handleScanDuplicates} disabled={isScanningDuplicates} style={{ width: '100%', padding: '10px', background: '#fff', border: '1px dashed #ec4899', color: '#ec4899', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' }}>
+            {isScanningDuplicates ? '🔍 掃描中...' : '🔍 開始掃描重複資料'}
+          </button>
+        </div>
+
+        {duplicateGroups !== null && (
+          <div style={{ marginTop: '15px' }}>
+            {duplicateGroups.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold', padding: '20px' }}>✅ 目前沒有可疑的重複資料！</div>
+            ) : (
+              <div>
+                <h4 style={{ color: '#333', fontSize: '15px', marginBottom: '10px' }}>發現 {duplicateGroups.length} 組可疑重複資料：</h4>
+                {duplicateGroups.map((group, gIndex) => (
+                  <div key={gIndex} style={{ background: '#fff', border: '1px solid #EAE3D2', borderRadius: '16px', padding: '15px', marginBottom: '15px' }}>
+                    <div style={{ fontSize: '13px', color: '#8b5cf6', fontWeight: 'bold', marginBottom: '10px', borderBottom: '1px dashed #EAE3D2', paddingBottom: '8px' }}>
+                      相同特徵：{group[0].date} / {group[0].type === 'expense' ? '支出' : '收入'} / ${group[0].amount}
+                    </div>
+                    {group.map((item, iIndex) => (
+                      <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: iIndex !== group.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '14px', color: '#333', fontWeight: 'bold' }}>{item.item || '無名稱'}</span>
+                          <span style={{ fontSize: '12px', color: '#666' }}>{item.category} • {item.payer || '無付款人'}</span>
+                        </div>
+                        <button onClick={() => handleDeleteDuplicate(item.id, gIndex)} style={{ padding: '6px 12px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>刪除此筆</button>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </CollapsibleCard>
 
     </div>
