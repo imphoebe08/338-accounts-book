@@ -138,8 +138,11 @@ export default function Settings() {
         const rowObj = headers.reduce((acc, curr, index) => ({ ...acc, [curr]: values[index] }), {});
         
         const rawAmount = rowObj['金額'] ? String(rowObj['金額']).replace(/[^0-9.-]+/g, '') : '0';
+        const rawAmountVal = rowObj['金額'] || rowObj['花費'] || rowObj['支出'] || rowObj['收入'] || '0';
+        const rawAmount = String(rawAmountVal).replace(/[^0-9.-]+/g, '');
         
         let rawDate = String(rowObj['日期'] || '').trim();
+        let rawDate = String(rowObj['日期'] || rowObj['記帳日期'] || rowObj['消費日期'] || '').trim();
         let parsedDate = new Date().toISOString().split('T')[0]; // 預設為今天
 
         if (rawDate) {
@@ -162,8 +165,34 @@ export default function Settings() {
 
         // ===== 增強版智慧收支判斷邏輯 =====
         const categoryStr = (rowObj['分類'] || '').trim();
+        // 處理第三方記帳軟體：將「主分類」作為實際分類，若「分類」為支出/收入則過濾掉
+        let categoryStr = (rowObj['主分類'] || rowObj['子分類'] || rowObj['分類'] || '').trim();
+        if (categoryStr === '支出' || categoryStr === '收入') categoryStr = '';
+
+        // 舊分類自動轉換對應表 (包含全轉小寫比對與錯字相容)
+        const categoryMapping = {
+          '伙食': '飲食',
+          '購物': '生活',
+          '日用品': '生活',
+          '數位': '數位訂閱',
+          '變漂漂': '打扮',
+          '治裝費': '打扮',
+          '學貸': '貸款',
+          '露營': '娛樂',
+          '淘寶': '生活',
+          '旅遊': '娛樂',
+          'swift': '交通',
+          'switft': '交通'
+        };
+        
+        const lowerCat = categoryStr.toLowerCase();
+        if (categoryMapping[lowerCat]) {
+          categoryStr = categoryMapping[lowerCat];
+        }
+
         let isIncome = false;
         const typeStr = String(rowObj['類型'] || rowObj['收支'] || rowObj['Type'] || '');
+        const typeStr = String(rowObj['類型'] || rowObj['收支'] || rowObj['Type'] || rowObj['分類'] || '');
         
         // 1. 若 CSV 有明確的類型欄位
         if (typeStr.includes('收') || typeStr.toLowerCase().includes('income')) {
@@ -187,11 +216,13 @@ export default function Settings() {
 
         return {
           item: rowObj['內容'] || '',
+          item: rowObj['內容'] || rowObj['備註'] || rowObj['項目'] || rowObj['說明'] || '',
           payer: rowObj['付款人'] || '',
           category: categoryStr || '其他',
           date: parsedDate,
           amount: finalAmount,
           type: fileType // 強制使用上傳時指定的類型 (income 或 expense)
+          type: fileType === 'auto' ? (isIncome ? 'income' : 'expense') : fileType
         };
       }).filter(item => item.item !== '' || item.amount !== 0); // 濾除無效空行
 
@@ -204,6 +235,28 @@ export default function Settings() {
       
       // 2. 正式寫入 Firebase
       try {
+        // 自動把沒見過的新分類加進系統設定清單裡
+        const newExpenseCats = new Set(expenseCats);
+        const newIncomeCats = new Set(incomeCats);
+        let settingsUpdated = false;
+
+        data.forEach(item => {
+          if (item.category && item.category !== '其他') {
+            if (item.type === 'expense' && !newExpenseCats.has(item.category)) {
+              newExpenseCats.add(item.category);
+              settingsUpdated = true;
+            } else if (item.type === 'income' && !newIncomeCats.has(item.category)) {
+              newIncomeCats.add(item.category);
+              settingsUpdated = true;
+            }
+          }
+        });
+
+        if (settingsUpdated) {
+          updateSetting('expenseCats', Array.from(newExpenseCats));
+          updateSetting('incomeCats', Array.from(newIncomeCats));
+        }
+
         await Promise.all(data.map(item => addDoc(collection(db, "transactions"), item)));
         alert(`成功讀取 ${data.length} 筆資料，並已全部上傳至 Firebase 雲端！`);
       } catch (error) {
@@ -248,8 +301,13 @@ export default function Settings() {
 
       <CollapsibleCard title="資料匯入" titleColor="#8b5cf6">
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>支援 Notion CSV 匯入，請確保第一行欄位標題包含：「內容,付款人,分類,日期,金額」。請將收入與支出分開上傳：</p>
+        <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>支援 Notion 與第三方記帳 APP 的 CSV 匯入。系統會自動辨識常見的欄位名稱 (如：主分類、記帳日期、備註) 並過濾不支援的欄位。</p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <div>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#3b82f6' }}>匯入「通用 / 第三方 APP」CSV</h4>
+            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'auto')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #3b82f6', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F0F4FF', boxSizing: 'border-box' }} />
+          </div>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#10b981' }}>匯入「收入」CSV</h4>
             <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'income')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #10b981', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#EAE3D2', boxSizing: 'border-box' }} />
