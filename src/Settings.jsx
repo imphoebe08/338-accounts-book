@@ -137,11 +137,9 @@ export default function Settings() {
         const values = parseCsvLine(line);
         const rowObj = headers.reduce((acc, curr, index) => ({ ...acc, [curr]: values[index] }), {});
         
-        const rawAmount = rowObj['金額'] ? String(rowObj['金額']).replace(/[^0-9.-]+/g, '') : '0';
         const rawAmountVal = rowObj['金額'] || rowObj['花費'] || rowObj['支出'] || rowObj['收入'] || '0';
         const rawAmount = String(rawAmountVal).replace(/[^0-9.-]+/g, '');
         
-        let rawDate = String(rowObj['日期'] || '').trim();
         let rawDate = String(rowObj['日期'] || rowObj['記帳日期'] || rowObj['消費日期'] || '').trim();
         let parsedDate = new Date().toISOString().split('T')[0]; // 預設為今天
 
@@ -164,7 +162,6 @@ export default function Settings() {
         }
 
         // ===== 增強版智慧收支判斷邏輯 =====
-        const categoryStr = (rowObj['分類'] || '').trim();
         // 處理第三方記帳軟體：將「主分類」作為實際分類，若「分類」為支出/收入則過濾掉
         let categoryStr = (rowObj['主分類'] || rowObj['子分類'] || rowObj['分類'] || '').trim();
         if (categoryStr === '支出' || categoryStr === '收入') categoryStr = '';
@@ -191,7 +188,6 @@ export default function Settings() {
         }
 
         let isIncome = false;
-        const typeStr = String(rowObj['類型'] || rowObj['收支'] || rowObj['Type'] || '');
         const typeStr = String(rowObj['類型'] || rowObj['收支'] || rowObj['Type'] || rowObj['分類'] || '');
         
         // 1. 若 CSV 有明確的類型欄位
@@ -215,13 +211,11 @@ export default function Settings() {
         const finalAmount = Math.abs(Number(rawAmount) || 0); // 存入 DB 一律轉正數
 
         return {
-          item: rowObj['內容'] || '',
           item: rowObj['內容'] || rowObj['備註'] || rowObj['項目'] || rowObj['說明'] || '',
           payer: rowObj['付款人'] || '',
           category: categoryStr || '其他',
           date: parsedDate,
           amount: finalAmount,
-          type: fileType // 強制使用上傳時指定的類型 (income 或 expense)
           type: fileType === 'auto' ? (isIncome ? 'income' : 'expense') : fileType
         };
       }).filter(item => item.item !== '' || item.amount !== 0); // 濾除無效空行
