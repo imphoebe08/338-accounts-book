@@ -38,6 +38,7 @@ export default function Overview({ transactions }) {
   const [editingTx, setEditingTx] = useState(null);
   const [viewMode, setViewMode] = useState('month'); // 'month' 或 'year'
   const [showLegend, setShowLegend] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
@@ -103,10 +104,19 @@ export default function Overview({ transactions }) {
       .sort((a, b) => b.value - a.value);
   }, [filteredTransactions]); // 依金額由大到小排序
 
-  // 根據點擊的圓餅圖色塊篩選顯示的項目
-  const displayedTransactions = selectedCategory 
-    ? filteredTransactions.filter(t => t.category === selectedCategory && t.type === 'expense') 
-    : filteredTransactions;
+  // 根據點擊的圓餅圖色塊與搜尋關鍵字篩選顯示的項目
+  const displayedTransactions = (selectedCategory 
+    ? filteredTransactions.filter(t => t.category === selectedCategory && t.type === 'expense')
+    : filteredTransactions).filter(tx => {
+      if (!searchKeyword.trim()) return true;
+      const keyword = searchKeyword.toLowerCase();
+      return (
+        (tx.item && tx.item.toLowerCase().includes(keyword)) ||
+        (tx.category && tx.category.toLowerCase().includes(keyword)) ||
+        (tx.payer && tx.payer.toLowerCase().includes(keyword)) ||
+        (tx.amount && String(tx.amount).includes(keyword))
+      );
+    });
 
   // 計算圓餅圖總計，用於圖例顯示比例
   const totalPieValue = pieData.reduce((sum, item) => sum + item.value, 0);
@@ -255,8 +265,20 @@ export default function Overview({ transactions }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>{viewMode === 'month' ? '本月' : '本年'}收支紀錄 {selectedCategory && <span style={{ color: '#D5B77A' }}>(篩選: {selectedCategory})</span>}</h3>
         </div>
+        
+        {/* 關鍵字搜尋 */}
+        <div style={{ marginBottom: '15px' }}>
+          <input 
+            type="text" 
+            placeholder="🔍 搜尋項目名稱、分類、付款人或金額..." 
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #EAE3D2', borderRadius: '20px', boxSizing: 'border-box', color: '#5C5446', background: '#F8F6F0', outline: 'none' }}
+          />
+        </div>
+
         {displayedTransactions.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>{selectedCategory ? `此分類${viewMode === 'month' ? '本月' : '本年'}尚無紀錄` : `這${viewMode === 'month' ? '個月' : '一年'}目前沒有紀錄喔！`}</div>
+          <div style={{ textAlign: 'center', color: '#999', padding: '20px 0' }}>{selectedCategory || searchKeyword ? '找不到符合條件的紀錄' : `這${viewMode === 'month' ? '個月' : '一年'}目前沒有紀錄喔！`}</div>
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {displayedTransactions.map((tx) => (
