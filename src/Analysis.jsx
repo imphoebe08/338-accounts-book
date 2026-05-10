@@ -328,10 +328,25 @@ export default function Analysis({ transactions, assets }) {
             
             <button onClick={handleResetFilters} style={{ padding: '8px 16px', background: '#F8F6F0', color: '#7A6F5D', border: 'none', borderRadius: '16px', cursor: 'pointer', fontSize: '14px' }}>清空</button>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', marginLeft: 'auto', fontWeight: 'bold', color: isComparing ? '#8b5cf6' : '#666' }}>
-              <input type="checkbox" checked={isComparing} onChange={e => setIsComparing(e.target.checked)} />
-              啟用比較
-            </label>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button 
+                onClick={() => {
+                  setIsComparing(true);
+                  setCompYear(filterYear - 1);
+                  setCompMonth(filterMonth || new Date().getMonth() + 1);
+                  setCompTxType(filterTxType);
+                  setCompCategory(filterCategory);
+                  setCompPayer(filterPayer);
+                }} 
+                style={{ padding: '8px 16px', background: '#f3e8ff', color: '#8b5cf6', border: '1px solid #d8b4fe', borderRadius: '16px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+              >
+                📊 比較去年同期
+              </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', fontWeight: 'bold', color: isComparing ? '#8b5cf6' : '#666' }}>
+                <input type="checkbox" checked={isComparing} onChange={e => setIsComparing(e.target.checked)} />
+                啟用比較
+              </label>
+            </div>
           </div>
 
           {isComparing && (
