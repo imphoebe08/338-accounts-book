@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import AssetModal from './AssetModal';
@@ -51,35 +51,39 @@ export default function Assets({ assets }) {
   const [isFetching, setIsFetching] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
 
-  // 真實串接 政府 Open API 與 Yahoo Finance API 更新收盤價
+  // 僅使用臺灣證券交易所官方 MIS 公開資訊更新收盤價
   const handleFetchPrices = async () => {
     setIsFetching(true);
     try {
-      // 自動判斷：若在本地開發則呼叫本機 Flask，若在 Vercel 則呼叫 Serverless Function
-      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://127.0.0.1:5000/update-prices' 
-        : '/api/update_prices';
+      const snapshotUrl = `${import.meta.env.BASE_URL}stock-prices.json?t=${Date.now()}`;
+      const res = await fetch(snapshotUrl, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`官方收盤價快照讀取失敗（HTTP ${res.status}）`);
 
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || `伺服器回應錯誤碼: ${res.status}`);
-        }
-        alert(`股價更新完成！(成功更新 ${data.count} 筆資料)`);
-      } else {
-        const text = await res.text();
-        // 判斷是否為本地手機測試且非 localhost 的情況
-        if (text.includes("<!doctype html>")) {
-          throw new Error("API 路由未生效。請確認您是在 Vercel 的網址上測試，而非本地區域網路 IP。");
-        }
-        throw new Error(`伺服器回傳格式錯誤 (${res.status}): ` + text.substring(0, 100));
+      const data = await res.json();
+      if (!data.prices || typeof data.prices !== 'object') {
+        throw new Error('官方收盤價快照格式錯誤');
       }
+
+      const priceResults = [];
+      const failed = [];
+      for (const stock of stocks) {
+        const symbol = String(stock.symbol || '').trim().toUpperCase().replace(/\.(TW|TWO)$/, '');
+        const quote = data.prices[symbol];
+        if (quote?.price) {
+          priceResults.push({ ...stock, symbol, ...quote });
+        } else {
+          failed.push(symbol || stock.item);
+        }
+      }
+
+      await Promise.all(priceResults.map(result => updateDoc(doc(db, 'assets', result.id), {
+        refPrice: result.price,
+        updatedAt: result.date,
+        quoteDate: result.date,
+        quotePriceType: '最近公開收盤價'
+      })));
+      const failedMessage = failed.length ? `\n未取得：${failed.join('、')}` : '';
+      alert(`收盤價更新完成！成功更新 ${priceResults.length} 筆資料。${failedMessage}`);
     } catch (e) {
       console.error(e);
       alert(`更新失敗: \n${e.message}`);
@@ -138,22 +142,22 @@ export default function Assets({ assets }) {
           <div style={{ fontSize: '14px', color: '#7A6F5D' }}>{selectedHolder} 總資產</div>
           <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#333' }}>${Math.round(grandTotal).toLocaleString()}</div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(213, 183, 122, 0.3)', paddingTop: '15px' }}>
-          <div style={{ textAlign: 'center', flex: 1 }}>
+        <div className="asset-summary-grid" style={{ borderTop: '1px solid rgba(213, 183, 122, 0.3)', paddingTop: '15px' }}>
+          <div className="asset-summary-item" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>股票市值</div>
             <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#ef4444' }}>
               ${Math.round(totalStockValue).toLocaleString()}
               <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px', fontWeight: 'normal' }}>({grandTotal > 0 ? ((totalStockValue / grandTotal) * 100).toFixed(1) : 0}%)</span>
             </div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1, borderLeft: '1px solid rgba(213, 183, 122, 0.3)', borderRight: '1px solid rgba(213, 183, 122, 0.3)' }}>
+          <div className="asset-summary-item" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>活期存款</div>
             <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#10b981' }}>
               ${Math.round(totalDemandValue).toLocaleString()}
               <span style={{ fontSize: '12px', color: '#999', marginLeft: '4px', fontWeight: 'normal' }}>({grandTotal > 0 ? ((totalDemandValue / grandTotal) * 100).toFixed(1) : 0}%)</span>
             </div>
           </div>
-          <div style={{ textAlign: 'center', flex: 1 }}>
+          <div className="asset-summary-item" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '12px', color: '#7A6F5D' }}>定期存款</div>
             <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#3b82f6' }}>
               ${Math.round(totalFixedValue).toLocaleString()}
@@ -183,7 +187,7 @@ export default function Assets({ assets }) {
                 <button style={{ padding: '6px 16px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => setEditingAsset(stock)}>編輯</button>
                 <button style={{ padding: '6px 16px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontSize: '13px' }} onClick={() => handleDeleteStock(stock.id)}>刪除</button>
               </div>
-              {stock.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>最後編輯日期：{stock.updatedAt}</div>}
+              {stock.updatedAt && <div className="card-date" style={{ marginTop: '8px' }}>報價更新：{stock.updatedAt}{stock.quotePriceType ? `（${stock.quotePriceType}）` : ''}</div>}
             </div>
           ))}
         </div>

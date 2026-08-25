@@ -42,6 +42,14 @@ const generateTitle = (y, m, txT, cat, payer) => {
 };
 
 export default function Analysis({ transactions, assets }) {
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 520px)').matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 520px)');
+    const handleChange = (event) => setIsMobile(event.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
   const [tab, setTab] = useState('income_expense');
   const [chartType, setChartType] = useState('bar'); // 'bar', 'line', 'pie'
 
@@ -510,17 +518,17 @@ export default function Analysis({ transactions, assets }) {
           {dynamicAssetData.length === 0 ? (
             <div style={{ display: 'flex', height: '450px', justifyContent: 'center', alignItems: 'center', color: '#999' }}>尚無財產紀錄</div>
           ) : (
-          <div style={{ width: '100%', minHeight: '550px' }}>
-          <ResponsiveContainer width="100%" height={550}>
+          <div style={{ width: '100%', minHeight: isMobile ? '380px' : '550px' }}>
+          <ResponsiveContainer width="100%" height={isMobile ? 380 : 550}>
             <PieChart>
               <Pie 
                 data={dynamicAssetData} 
-                cx="50%" cy="45%" 
-                innerRadius={80} outerRadius={120} 
+                cx="50%" cy={isMobile ? '42%' : '45%'}
+                innerRadius={isMobile ? 55 : 80} outerRadius={isMobile ? 88 : 120}
                 paddingAngle={5} 
                 dataKey="value"
-                labelLine={true}
-                label={renderCustomizedLabel}
+                labelLine={!isMobile}
+                label={isMobile ? false : renderCustomizedLabel}
               >
                 {dynamicAssetData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
               </Pie>

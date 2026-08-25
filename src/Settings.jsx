@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
 import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { loadAndMaterializeRecurringTransactions } from './recurring';
 
 export default function Settings() {
   const [expenseCats, setExpenseCats] = useState(EXPENSE_CATEGORIES);
@@ -12,6 +13,7 @@ export default function Settings() {
   const [payers, setPayers] = useState(PAYERS);
   const [stocks, setStocks] = useState(STOCKS);
   const [banks, setBanks] = useState(BANKS);
+  const [recurringTransactions, setRecurringTransactions] = useState([]);
 
   // 匯出 CSV 用的日期範圍
   const [exportStartDate, setExportStartDate] = useState('');
@@ -44,6 +46,23 @@ export default function Settings() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'recurringTransactions'), (snapshot) => {
+      setRecurringTransactions(snapshot.docs.map(item => ({ id: item.id, ...item.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const toggleRecurringTransaction = async (item) => {
+    await updateDoc(doc(db, 'recurringTransactions', item.id), { active: item.active === false });
+    if (item.active === false) await loadAndMaterializeRecurringTransactions(db);
+  };
+
+  const removeRecurringTransaction = async (item) => {
+    if (!window.confirm(`確定停止「${item.item}」的每月重複嗎？\n已經產生的收支紀錄會保留。`)) return;
+    await deleteDoc(doc(db, 'recurringTransactions', item.id));
+  };
 
   // 更新資料回 Firebase
   const updateSetting = async (key, newList) => {
@@ -419,6 +438,27 @@ export default function Settings() {
 
         <h4 style={{ color: '#333', fontSize: '15px' }}>銀行與券商管理</h4>
         <ManageList items={banks} onUpdate={(list) => updateSetting('banks', list)} label="銀行與券商" color="#3b82f6" />
+      </CollapsibleCard>
+
+      <CollapsibleCard title="每月重複記帳" titleColor="#D5B77A">
+        <p style={{ fontSize: '13px', color: '#666', marginBottom: '15px' }}>在新增收支時開啟「每月自動重複」，即可在這裡暫停或刪除規則。刪除規則不會刪除已產生的紀錄。</p>
+        {recurringTransactions.length === 0 ? (
+          <div style={{ padding: '18px', textAlign: 'center', color: '#999', background: '#F8F6F0', borderRadius: '16px' }}>目前沒有每月重複項目</div>
+        ) : recurringTransactions
+          .slice()
+          .sort((a, b) => (a.dayOfMonth || 0) - (b.dayOfMonth || 0))
+          .map(item => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px', marginBottom: '10px', background: '#fff', border: '1px solid #EAE3D2', borderRadius: '16px', opacity: item.active === false ? 0.6 : 1 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.item}</div>
+                <div style={{ fontSize: '12px', color: '#888', marginTop: '3px' }}>每月 {item.dayOfMonth} 日 • {item.category} • ${Number(item.amount || 0).toLocaleString()}</div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button onClick={() => toggleRecurringTransaction(item)} style={{ padding: '7px 10px', background: item.active === false ? '#10b981' : '#f59e0b', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' }}>{item.active === false ? '恢復' : '暫停'}</button>
+                <button onClick={() => removeRecurringTransaction(item)} style={{ padding: '7px 10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '12px' }}>刪除</button>
+              </div>
+            </div>
+          ))}
       </CollapsibleCard>
 
       <CollapsibleCard title="資料匯入" titleColor="#8b5cf6">

@@ -6,6 +6,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
 import { db } from './firebase'
 import TransactionModal from './TransactionModal'
 import AssetModal from './AssetModal'
+import { loadAndMaterializeRecurringTransactions } from './recurring'
 
 // 啟用路由懶加載 (Lazy Loading)，加速網頁首次載入速度
 const Overview = lazy(() => import('./Overview'));
@@ -135,6 +136,13 @@ function App() {
       unsubTx();
       unsubAssets();
     };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadAndMaterializeRecurringTransactions(db).catch((error) => {
+      console.error('產生每月重複帳目失敗:', error);
+    });
   }, [user]);
 
   const handleLogin = () => {

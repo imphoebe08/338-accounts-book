@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS } from './config';
-import { collection, addDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOccurrenceId } from './recurring';
 
 export default function TransactionModal({ onClose, editData }) {
   // 新增狀態保存來自 Firebase 的使用者設定
@@ -36,6 +37,7 @@ export default function TransactionModal({ onClose, editData }) {
   const [category, setCategory] = useState(editData?.category || '');
   const [payer, setPayer] = useState(editData?.payer || '');
   const [errors, setErrors] = useState([]);
+  const [repeatMonthly, setRepeatMonthly] = useState(false);
 
   // 平滑關閉動畫狀態
   const [isClosing, setIsClosing] = useState(false);
@@ -148,6 +150,32 @@ export default function TransactionModal({ onClose, editData }) {
           amount: finalAmount,
           date: date,
         });
+      } else if (repeatMonthly) {
+        const recurringRef = doc(collection(db, 'recurringTransactions'));
+        const transactionData = {
+          type,
+          item,
+          category,
+          payer,
+          amount: finalAmount,
+          date,
+          recurringId: recurringRef.id,
+          isRecurringOccurrence: true,
+        };
+        const batch = writeBatch(db);
+        batch.set(recurringRef, {
+          type,
+          item,
+          category,
+          payer,
+          amount: finalAmount,
+          startDate: date,
+          dayOfMonth: Number(date.slice(8, 10)),
+          active: true,
+          createdAt: new Date().toISOString(),
+        });
+        batch.set(doc(db, 'transactions', getOccurrenceId(recurringRef.id, date)), transactionData);
+        await batch.commit();
       } else {
         await addDoc(collection(db, 'transactions'), {
           type,
@@ -282,6 +310,16 @@ export default function TransactionModal({ onClose, editData }) {
               ))}
             </div>
           </div>
+
+          {!editData && (
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '12px 14px', background: '#F8F6F0', border: '1px solid #EAE3D2', borderRadius: '16px', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontSize: '14px', color: '#5C5446', fontWeight: 'bold' }}>每月自動重複</div>
+                <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>每月同一天自動新增；月底不足天數時使用該月最後一天</div>
+              </div>
+              <input type="checkbox" checked={repeatMonthly} onChange={(event) => setRepeatMonthly(event.target.checked)} style={{ width: '20px', height: '20px', accentColor: '#D5B77A', flexShrink: 0 }} />
+            </label>
+          )}
         </div>
 
         <div className="keypad">

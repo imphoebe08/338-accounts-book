@@ -176,6 +176,41 @@ input[type="month"]::-webkit-calendar-picker-indicator {
   color: #a0a0a0;
 }
 
+.asset-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.asset-summary-item {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.asset-summary-item + .asset-summary-item {
+  border-left: 1px solid rgba(213, 183, 122, 0.3);
+}
+
+@media (max-width: 520px) {
+  .asset-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .asset-summary-item {
+    padding: 0 0 12px;
+  }
+
+  .asset-summary-item + .asset-summary-item {
+    border-left: 0;
+    border-top: 1px solid rgba(213, 183, 122, 0.3);
+    padding-top: 12px;
+  }
+
+  .asset-summary-item:last-child {
+    padding-bottom: 0;
+  }
+}
+
 /* 右下角懸浮按鈕 FAB */
 .fab {
   position: fixed;

@@ -106,9 +106,9 @@ export default function Overview({ transactions }) {
   }, [filteredTransactions, pieType]); // 依金額由大到小排序
 
   // 根據點擊的圓餅圖色塊與搜尋關鍵字篩選顯示的項目
-  const displayedTransactions = (selectedCategory 
-    ? filteredTransactions.filter(t => t.category === selectedCategory && t.type === pieType)
-    : filteredTransactions).filter(tx => {
+  const displayedTransactions = filteredTransactions.filter(t =>
+    t.type === pieType && (!selectedCategory || t.category === selectedCategory)
+  ).filter(tx => {
       if (!searchKeyword.trim()) return true;
       const keyword = searchKeyword.toLowerCase();
       return (
@@ -292,7 +292,7 @@ export default function Overview({ transactions }) {
               <div className="swipe-content">
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <span style={{ fontSize: '16px', fontWeight: '500', color: '#333' }}>{tx.item}</span>
-                  <span style={{ fontSize: '12px', color: '#888' }}>{tx.date} • {tx.category}{tx.payer ? ` • ${tx.payer}` : ''}</span>
+                  <span style={{ fontSize: '12px', color: '#888' }}>{tx.date} • {tx.category}{tx.payer ? ` • ${tx.payer}` : ''}{tx.isRecurringOccurrence ? ' • 每月重複' : ''}</span>
                 </div>
                 <div style={{ fontSize: '18px', fontWeight: 'bold', color: tx.type === 'expense' ? '#ef4444' : '#10b981' }}>
                   {tx.type === 'expense' ? '-' : '+'}${tx.amount.toLocaleString()}
