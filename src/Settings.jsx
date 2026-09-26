@@ -372,6 +372,16 @@ export default function Settings() {
           'switft': '交通'
         };
         
+        const incomeCategoryMapping = {
+          '發票中獎': '發票',
+          '薪資': '薪水',
+          '薪酬': '薪水',
+          '獎金': '薪水',
+          '年終獎金': '薪水',
+          '退款': '其他',
+          '回饋': '其他'
+        };
+
         const sourceCategory = categoryStr;
         const lowerCat = normalizeCategory(categoryStr);
         const mappedCategory = categoryMapping[lowerCat] || categoryStr;
@@ -401,8 +411,12 @@ export default function Settings() {
 
         const finalType = fileType === 'auto' ? (isIncome ? 'income' : 'expense') : fileType;
         const categories = finalType === 'income' ? incomeCats : expenseCats;
-        const finalCategory = matchCategory(sourceCategory || '其他', categories)
-          || matchCategory(mappedCategory || '其他', categories);
+        // 收入別名先轉換，再取得目前設定中的完整名稱；缺少目標時交由選單處理。
+        const incomeTarget = finalType === 'income' ? incomeCategoryMapping[lowerCat] : null;
+        const finalCategory = incomeTarget
+          ? matchCategory(incomeTarget, categories)
+          : (matchCategory(sourceCategory || '其他', categories)
+            || matchCategory(mappedCategory || '其他', categories));
         return {
           item: rowObj['內容'] || rowObj['備註'] || rowObj['項目'] || rowObj['說明'] || '',
           payer: rowObj['付款人'] || '',
