@@ -17,6 +17,12 @@ export function parseAmount(value) {
   return Number.isFinite(amount) ? amount : null;
 }
 
+export const UNASSIGNED_PAYER = '__unassigned_payer__';
+
+export function normalizePayer(value) {
+  return typeof value === 'string' ? value.normalize('NFKC').trim().replace(/\s+/gu, ' ') : '';
+}
+
 export function prepareTransactions(transactions) {
   const valid = [], invalid = [], duplicates = [];
   const seen = new Set();
@@ -29,17 +35,18 @@ export function prepareTransactions(transactions) {
       continue;
     }
     const category = tx.category || '未分類';
-    const key = JSON.stringify([parts.year, parts.month, parts.day, tx.type, category, tx.item || '', tx.payer || '', cents]);
+    const payer = normalizePayer(tx.payer);
+    const key = JSON.stringify([parts.year, parts.month, parts.day, tx.type, category, tx.item || '', payer, cents]);
     if (seen.has(key)) duplicates.push(tx);
     seen.add(key);
-    valid.push({ ...tx, ...parts, amount: cents / 100, cents, category });
+    valid.push({ ...tx, ...parts, amount: cents / 100, cents, category, payer });
   }
   return { valid, invalid, duplicates };
 }
 
 export function buildComparison(transactions, { years, month = 0, category = '', payer = '', metric = 'expense', cumulative = false }) {
   const selected = transactions.filter(tx => years.includes(tx.year) && (!month || tx.month === month)
-    && (!category || tx.category === category) && (!payer || tx.payer === payer));
+    && (!category || tx.category === category) && (!payer || (payer === UNASSIGNED_PAYER ? !tx.payer : tx.payer === normalizePayer(payer))));
   const size = month ? Math.max(...years.map(year => new Date(Date.UTC(year, month, 0)).getUTCDate())) : 12;
   const points = Array.from({ length: size }, (_, i) => ({ name: `${i + 1}${month ? '日' : '月'}` }));
   const summaries = years.map(year => {
@@ -59,4 +66,19 @@ export function buildComparison(transactions, { years, month = 0, category = '',
       rows: relevant.sort((a, b) => b.month - a.month || b.day - a.day) };
   });
   return { points, summaries };
+}
+
+// Annual totals and YoY use the same filters, including an unselected prior year.
+export function buildAnnualComparison(transactions, { years, month = 0, category = '', payer = '', metric = 'expense' }) {
+  const baselineYears = [...new Set(years.flatMap(year => [year, year - 1]))];
+  const { summaries } = buildComparison(transactions, { years: baselineYears, month, category, payer, metric });
+  const annual = [...years].sort((a, b) => a - b).map(year => {
+    const summary = summaries.find(item => item.year === year);
+    const previous = summaries.find(item => item.year === year - 1);
+    const total = summary.count ? summary[metric] : null;
+    const previousTotal = previous?.count ? previous[metric] : null;
+    const growth = total !== null && previousTotal > 0 ? (total - previousTotal) / previousTotal * 100 : null;
+    return { ...summary, name: `${year} 年`, total, previousTotal, growth };
+  });
+  return { points: annual, summaries: annual };
 }

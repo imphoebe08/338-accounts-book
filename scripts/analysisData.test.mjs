@@ -52,3 +52,44 @@ test('possible duplicates are reported without silently deleting legitimate tran
   assert.equal(result.valid.length, 3);
   assert.equal(buildComparison(result.valid, { years: [2024] }).summaries[0].expense, 20);
 });
+
+test('annual chart sums all months into one point per year in chronological order', async () => {
+  const { buildAnnualComparison } = await import('../src/analysisData.js');
+  const prepared = prepareTransactions([tx('2023-01-01', 100), tx('2023-12-01', 100), tx('2024-01-01', 250)]);
+  const result = buildAnnualComparison(prepared.valid, { years: [2024, 2023] });
+  assert.deepEqual(result.points.map(point => [point.year, point.total, point.growth]), [[2023, 200, null], [2024, 250, 25]]);
+});
+
+test('growth compares the preceding calendar year even if it is not selected', async () => {
+  const { buildAnnualComparison } = await import('../src/analysisData.js');
+  const prepared = prepareTransactions([tx('2022-01-01', 50), tx('2023-01-01', 100), tx('2024-01-01', 125)]);
+  const result = buildAnnualComparison(prepared.valid, { years: [2022, 2024] });
+  assert.equal(result.points[1].growth, 25);
+  assert.equal(result.points[1].previousTotal, 100);
+});
+
+test('payer normalization joins harmless formatting variants but not different people', async () => {
+  const { buildAnnualComparison, UNASSIGNED_PAYER } = await import('../src/analysisData.js');
+  const prepared = prepareTransactions([
+    tx('2023-01-01', 100, 'expense', '飲食', 'Bobo'),
+    tx('2024-01-01', 40, 'expense', '飲食', ' Bobo '),
+    tx('2024-02-01', 80, 'expense', '飲食', 'Ｂｏｂｏ'),
+    tx('2024-01-01', 900, 'expense', '飲食', '其他人'),
+    tx('2024-01-01', 500, 'expense', '飲食', '')
+  ]);
+  const result = buildAnnualComparison(prepared.valid, { years: [2024], payer: 'Bobo' });
+  assert.equal(result.points[0].total, 120);
+  assert.equal(result.points[0].growth, 20);
+  assert.equal(result.points[0].count, 2);
+  assert.equal(buildAnnualComparison(prepared.valid, { years: [2024], payer: UNASSIGNED_PAYER }).points[0].total, 500);
+});
+
+test('yearly rates retain the same month/category/payer and avoid zero or negative baselines', async () => {
+  const { buildAnnualComparison } = await import('../src/analysisData.js');
+  const prepared = prepareTransactions([tx('2023-02-01', 100), tx('2023-03-01', 500), tx('2024-02-01', 80), tx('2024-02-01', 800, 'expense', '交通')]);
+  assert.equal(buildAnnualComparison(prepared.valid, { years: [2024], month: 2, category: '飲食', payer: '自己' }).points[0].growth, -20);
+  for (const rows of [[tx('2023-01-01', 0), tx('2024-01-01', 10)], [tx('2023-01-01', 10), tx('2024-01-01', 20)], [tx('2024-01-01', 10)]]) {
+    const result = buildAnnualComparison(prepareTransactions(rows).valid, { years: [2024], metric: 'balance' });
+    assert.equal(result.points[0].growth, null);
+  }
+});
