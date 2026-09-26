@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
+import { prepareTransactions } from './analysisData';
 import TransactionModal from './TransactionModal';
 
 const COLORS = [
@@ -32,7 +33,8 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   );
 };
 
-export default function Overview({ transactions }) {
+export default function Overview({ transactions: rawTransactions }) {
+  const transactions = useMemo(() => prepareTransactions(rawTransactions).valid, [rawTransactions]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingTx, setEditingTx] = useState(null);
@@ -77,16 +79,15 @@ export default function Overview({ transactions }) {
 
   // 依據選擇的年月過濾資料
   const filteredTransactions = useMemo(() => transactions.filter(tx => {
-    const txDate = new Date(tx.date);
     if (viewMode === 'year') {
-      return txDate.getFullYear() === year;
+      return tx.year === year;
     }
-    return txDate.getFullYear() === year && txDate.getMonth() + 1 === month;
+    return tx.year === year && tx.month === month;
   }), [transactions, viewMode, year, month]);
 
   const { totalIncome, totalExpense } = useMemo(() => ({
-    totalIncome: filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-    totalExpense: filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+    totalIncome: filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.cents, 0) / 100,
+    totalExpense: filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.cents, 0) / 100
   }), [filteredTransactions]);
 
   // 動態計算當月收支的圓餅圖資料
@@ -95,13 +96,13 @@ export default function Overview({ transactions }) {
       .filter(t => t.type === pieType)
       .reduce((acc, tx) => {
         if (!acc[tx.category]) acc[tx.category] = { value: 0, items: new Set() };
-        acc[tx.category].value += tx.amount;
+        acc[tx.category].value += tx.cents;
         if (tx.item) acc[tx.category].items.add(tx.item);
         return acc;
       }, {});
       
     return Object.entries(grouped)
-      .map(([name, data]) => ({ name, value: data.value, items: Array.from(data.items) }))
+      .map(([name, data]) => ({ name, value: data.value / 100, items: Array.from(data.items) }))
       .sort((a, b) => b.value - a.value);
   }, [filteredTransactions, pieType]); // 依金額由大到小排序
 
