@@ -1,5 +1,5 @@
 // 設定與資料管理頁面
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
 import { collection, addDoc, doc, setDoc, onSnapshot, getDocs, query, orderBy, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -14,6 +14,44 @@ export default function Settings() {
   const [stocks, setStocks] = useState(STOCKS);
   const [banks, setBanks] = useState(BANKS);
   const [recurringTransactions, setRecurringTransactions] = useState([]);
+
+  const [pendingImport, setPendingImport] = useState(null);
+  const [categoryChoices, setCategoryChoices] = useState({});
+  const [isImporting, setIsImporting] = useState(false);
+  const importDialog = useRef(null);
+
+  useEffect(() => {
+    if (pendingImport && !importDialog.current.open) importDialog.current.showModal();
+  }, [pendingImport]);
+
+  const saveImportedData = async (data) => {
+    setIsImporting(true);
+    try {
+      await Promise.all(data.map(item => addDoc(collection(db, 'transactions'), item)));
+      const existingData = JSON.parse(localStorage.getItem('local_transactions') || '[]');
+      localStorage.setItem('local_transactions', JSON.stringify([...existingData, ...data]));
+      alert(`成功匯入 ${data.length} 筆資料！`);
+      setPendingImport(null);
+    } catch (error) {
+      console.error('CSV 匯入失敗:', error);
+      alert('匯入失敗，部分資料可能已儲存，請先檢查紀錄再重新匯入。');
+      setPendingImport(null);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const finishPendingImport = async () => {
+    const data = pendingImport.data.map(({ sourceCategory, ...item }) => ({
+      ...item,
+      category: item.category || categoryChoices[JSON.stringify([item.type, sourceCategory])]
+    }));
+    if (data.some(item => !(item.type === 'income' ? incomeCats : expenseCats).includes(item.category))) {
+      alert('請為所有待匯入資料選擇目前設定中的分類；設定可能已變更，請重新選擇或重新匯入。');
+      return;
+    }
+    await saveImportedData(data);
+  };
 
   // 匯出 CSV 用的日期範圍
   const [exportStartDate, setExportStartDate] = useState('');
@@ -230,7 +268,7 @@ export default function Settings() {
         });
         downloadCSV(csv, `財產清單備份_${new Date().toISOString().split('T')[0]}.csv`);
       }
-    } catch (e) {
+    } catch {
       alert('匯出時發生錯誤！');
     }
   };
@@ -269,6 +307,19 @@ export default function Settings() {
         ret.push(col.trim());
         return ret;
       };
+
+      // 比對時忽略 Emoji、空白與英文大小寫，儲存時保留設定中的完整名稱。
+      const normalizeCategory = (value) => String(value).normalize('NFKC')
+        .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]/gu, '')
+        .toLowerCase();
+      const matchCategory = (value, categories) => {
+        if (categories.includes(value)) return value;
+        const key = normalizeCategory(value);
+        if (!key) return null;
+        const matches = categories.filter(category => normalizeCategory(category) === key);
+        return matches.length === 1 ? matches[0] : null;
+      };
+
 
       // 解析標題與內容
       const headers = parseCsvLine(lines[0]);
@@ -321,12 +372,11 @@ export default function Settings() {
           'switft': '交通'
         };
         
-        const lowerCat = categoryStr.toLowerCase();
-        if (categoryMapping[lowerCat]) {
-          categoryStr = categoryMapping[lowerCat];
-        }
+        const sourceCategory = categoryStr;
+        const lowerCat = normalizeCategory(categoryStr);
+        const mappedCategory = categoryMapping[lowerCat] || categoryStr;
 
-        let isIncome = false;
+        let isIncome;
         const typeStr = String(rowObj['類型'] || rowObj['收支'] || rowObj['Type'] || rowObj['分類'] || '');
         
         // 1. 若 CSV 有明確的類型欄位
@@ -342,58 +392,43 @@ export default function Settings() {
         // 3. 根據分類或內容關鍵字聰明猜測
         else {
           const incomeKeywords = ['薪', '獎金', '利息', '收入', '中獎', '發票', '退款', '回饋', '股息'];
-          isIncome = incomeCats.includes(categoryStr) || 
+          isIncome = Boolean(matchCategory(categoryStr, incomeCats) || matchCategory(mappedCategory, incomeCats)) ||
                      incomeKeywords.some(k => categoryStr.includes(k)) ||
                      incomeKeywords.some(k => String(rowObj['內容'] || '').includes(k));
         }
 
         const finalAmount = Math.abs(Number(rawAmount) || 0); // 存入 DB 一律轉正數
 
+        const finalType = fileType === 'auto' ? (isIncome ? 'income' : 'expense') : fileType;
+        const categories = finalType === 'income' ? incomeCats : expenseCats;
+        const finalCategory = matchCategory(sourceCategory || '其他', categories)
+          || matchCategory(mappedCategory || '其他', categories);
         return {
           item: rowObj['內容'] || rowObj['備註'] || rowObj['項目'] || rowObj['說明'] || '',
           payer: rowObj['付款人'] || '',
-          category: categoryStr || '其他',
+          category: finalCategory,
+          sourceCategory,
           date: parsedDate,
           amount: finalAmount,
-          type: fileType === 'auto' ? (isIncome ? 'income' : 'expense') : fileType
+          type: finalType
         };
       }).filter(item => item.item !== '' || item.amount !== 0); // 濾除無效空行
 
-      // 1. 寫入本地端資料庫 (LocalStorage) 測試
-      const existingData = JSON.parse(localStorage.getItem('local_transactions') || '[]');
-      const updatedData = [...existingData, ...data];
-      localStorage.setItem('local_transactions', JSON.stringify(updatedData));
-
-      console.log('準備匯入的 CSV 資料:', data);
-      
-      // 2. 正式寫入 Firebase
-      try {
-        // 自動把沒見過的新分類加進系統設定清單裡
-        const newExpenseCats = new Set(expenseCats);
-        const newIncomeCats = new Set(incomeCats);
-        let settingsUpdated = false;
-
-        data.forEach(item => {
-          if (item.category && item.category !== '其他') {
-            if (item.type === 'expense' && !newExpenseCats.has(item.category)) {
-              newExpenseCats.add(item.category);
-              settingsUpdated = true;
-            } else if (item.type === 'income' && !newIncomeCats.has(item.category)) {
-              newIncomeCats.add(item.category);
-              settingsUpdated = true;
-            }
-          }
-        });
-
-        if (settingsUpdated) {
-          updateSetting('expenseCats', Array.from(newExpenseCats));
-          updateSetting('incomeCats', Array.from(newIncomeCats));
-        }
-
-        await Promise.all(data.map(item => addDoc(collection(db, "transactions"), item)));
-        alert(`成功讀取 ${data.length} 筆資料，並已全部上傳至 Firebase 雲端！`);
-      } catch (error) {
-        console.error("Firebase 上傳失敗:", error);
+      const groups = new Map();
+      data.filter(item => !item.category).forEach(item => {
+        const key = JSON.stringify([item.type, item.sourceCategory]);
+        const group = groups.get(key) || { key, type: item.type, sourceCategory: item.sourceCategory, count: 0 };
+        group.count += 1;
+        groups.set(key, group);
+      });
+      if (groups.size > 0) {
+        setCategoryChoices({});
+        setPendingImport({ data, groups: [...groups.values()] });
+      } else {
+        await saveImportedData(data.map(item => ({
+          item: item.item, payer: item.payer, category: item.category,
+          date: item.date, amount: item.amount, type: item.type
+        })));
       }
 
       e.target.value = ''; // 清空輸入框以便重複上傳
@@ -404,6 +439,36 @@ export default function Settings() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       <h2 style={{ marginBottom: '20px' }}>設定</h2>
+      {pendingImport && (
+        <dialog ref={importDialog} aria-labelledby="import-category-title"
+          onCancel={event => { event.preventDefault(); if (!isImporting) setPendingImport(null); }}
+          style={{ width: 'min(520px, 90vw)', maxHeight: '80vh', overflowY: 'auto', border: 'none', borderRadius: '20px', padding: '24px', boxSizing: 'border-box' }}>
+          <h3 id="import-category-title">設定未匹配的分類</h3>
+          <p>已解析 {pendingImport.data.length} 筆資料，尚未儲存。請指定以下分類的對應；同類型、同名稱的紀錄會一起套用。</p>
+          {pendingImport.groups.map(group => {
+            const categories = group.type === 'income' ? incomeCats : expenseCats;
+            return (
+              <label key={group.key} style={{ display: 'block', marginBottom: '16px' }}>
+                <span>{group.type === 'income' ? '收入' : '支出'}：{group.sourceCategory || '（空白）'}（{group.count} 筆）</span>
+                <select value={categories.includes(categoryChoices[group.key]) ? categoryChoices[group.key] : ''}
+                  disabled={isImporting} required
+                  onChange={event => setCategoryChoices(previous => ({ ...previous, [group.key]: event.target.value }))}
+                  style={{ display: 'block', width: '100%', marginTop: '8px', padding: '10px', borderRadius: '8px' }}>
+                  <option value="">請選擇系統分類</option>
+                  {categories.map(category => <option key={category} value={category}>{category}</option>)}
+                </select>
+                {categories.length === 0 && <small>目前沒有可選分類，請取消匯入後先至設定新增分類。</small>}
+              </label>
+            );
+          })}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <button disabled={isImporting} onClick={() => setPendingImport(null)}>取消匯入</button>
+            <button disabled={isImporting || pendingImport.groups.some(group =>
+              !(group.type === 'income' ? incomeCats : expenseCats).includes(categoryChoices[group.key]))}
+              onClick={finishPendingImport}>{isImporting ? '匯入中…' : '套用並完成匯入'}</button>
+          </div>
+        </dialog>
+      )}
       
       <CollapsibleCard title="支出設定" titleColor="#ef4444">
         <h4 style={{ color: '#333', fontSize: '15px' }}>分類管理</h4>
@@ -462,21 +527,21 @@ export default function Settings() {
       </CollapsibleCard>
 
       <CollapsibleCard title="資料匯入" titleColor="#8b5cf6">
-        <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>支援 Notion CSV 匯入，請確保第一行欄位標題包含：「內容,付款人,分類,日期,金額」。請將收入與支出分開上傳：</p>
+        <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>匯入分類會對應目前設定中的完整名稱，不會自動新增分類。解析完成後，無法對應的分類會跳出選單，設定完即可完成匯入。</p>
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>支援 Notion 與第三方記帳 APP 的 CSV 匯入。系統會自動辨識常見的欄位名稱 (如：主分類、記帳日期、備註) 並過濾不支援的欄位。</p>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#3b82f6' }}>匯入「通用 / 第三方 APP」CSV</h4>
-            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'auto')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #3b82f6', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F0F4FF', boxSizing: 'border-box' }} />
+            <input type="file" accept=".csv" disabled={isImporting || Boolean(pendingImport)} onChange={(e) => handleFileUpload(e, 'auto')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #3b82f6', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F0F4FF', boxSizing: 'border-box' }} />
           </div>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#10b981' }}>匯入「收入」CSV</h4>
-            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'income')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #10b981', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#EAE3D2', boxSizing: 'border-box' }} />
+            <input type="file" accept=".csv" disabled={isImporting || Boolean(pendingImport)} onChange={(e) => handleFileUpload(e, 'income')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #10b981', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#EAE3D2', boxSizing: 'border-box' }} />
           </div>
           <div>
             <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#ef4444' }}>匯入「支出」CSV</h4>
-            <input type="file" accept=".csv" onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F8F6F0', boxSizing: 'border-box' }} />
+            <input type="file" accept=".csv" disabled={isImporting || Boolean(pendingImport)} onChange={(e) => handleFileUpload(e, 'expense')} style={{ display: 'block', width: '100%', padding: '15px', border: '2px dashed #ef4444', borderRadius: '20px', cursor: 'pointer', color: '#666', background: '#F8F6F0', boxSizing: 'border-box' }} />
           </div>
         </div>
       </CollapsibleCard>
