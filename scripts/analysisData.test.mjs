@@ -93,3 +93,46 @@ test('yearly rates retain the same month/category/payer and avoid zero or negati
     assert.equal(result.points[0].growth, null);
   }
 });
+
+test('羊羊 income / all categories / full year excludes other payers and expenses', async () => {
+  const { buildAnnualComparison } = await import('../src/analysisData.js');
+  const rows = [
+    tx('2024-01-01', '500,000', 'income', '薪水', '羊羊'),
+    tx('2024-12-31', 100000, 'income', '獎金', '羊羊'),
+    tx('2025-01-01', 600000, 'income', '薪水', '羊羊'),
+    tx('2025-12-31', '120,000', 'income', '獎金', ' 羊羊 '),
+    tx('2025-01-01', 999999, 'income', '薪水', 'Bobo'),
+    tx('2025-01-01', 888888, 'income', '薪水', ''),
+    tx('2025-01-01', 777777, 'expense', '生活', '羊羊'),
+    tx('2025-01-01', 60000, 'income', '薪水', '🐑 羊羊')
+  ];
+  const result = buildAnnualComparison(prepareTransactions(rows).valid, {
+    years: [2024, 2025], metric: 'income', category: '', month: 0, payer: '羊羊'
+  });
+  assert.deepEqual(result.points.map(point => point.total), [600000, 780000]);
+  assert.equal(result.points[1].growth, 30);
+  assert.deepEqual(result.summaries.map(summary => summary.count), [2, 3]);
+  for (const summary of result.summaries) {
+    assert.ok(summary.rows.every(row => row.type === 'income' && row.payer === '羊羊'));
+    assert.equal(summary.total, summary.rows.reduce((sum, row) => sum + row.cents, 0) / 100);
+  }
+});
+
+
+test('confirmed 羊羊 and 滾滾 identities merge decorations but stay separate', async () => {
+  const { normalizePayer, buildAnnualComparison } = await import('../src/analysisData.js');
+  for (const name of ['羊羊', '🐑 羊羊', '羊 羊', '羊羊 🐏', ' 羊羊　']) assert.equal(normalizePayer(name), '羊羊');
+  for (const name of ['滾滾', '🐻 滾滾', '滾 滾', '滾滾 🐼']) assert.equal(normalizePayer(name), '滾滾');
+  assert.equal(normalizePayer(''), '');
+  assert.equal(normalizePayer('舊名稱'), '舊名稱');
+  const rows = prepareTransactions([
+    tx('2025-01-01', 100, 'income', '薪水', '羊羊'),
+    tx('2025-02-01', 200, 'income', '薪水', '🐑 羊羊'),
+    tx('2025-03-01', 400, 'income', '薪水', '🐻 滾滾'),
+    tx('2025-04-01', 800, 'income', '薪水', '滾滾'),
+    tx('2025-05-01', 1600, 'income', '薪水', '')
+  ]).valid;
+  for (const [payer, total] of [['羊羊', 300], ['🐑 羊羊', 300], ['滾滾', 1200]]) {
+    assert.equal(buildAnnualComparison(rows, { years: [2025], payer, metric: 'income' }).points[0].total, total);
+  }
+});

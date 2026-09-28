@@ -57,9 +57,9 @@ export default function Analysis({ transactions = [], assets = [] }) {
         </section>
 
         <details className="analysis-warning"><summary>付款人核對：{payer === UNASSIGNED_PAYER ? '未填付款人' : payer || '全部付款人'} · 符合 {comparison.summaries.reduce((sum, row) => sum + row.count, 0)} 筆</summary>
-          <p>同名付款人的前後空白與全形字元已統一。不同名稱或 Emoji 仍視為不同付款人；不會自行推測是同一人。</p>
+          <p>羊羊與滾滾會合併各自含 Emoji、空白或全形字元的名稱，統一計入同一位付款人。</p>
           <p>所選年份、分類與月份共有 {missingPayers} 筆未填付款人。選擇特定付款人時不會計入這些紀錄，可選「未填付款人」查看。</p>
-          <p>若曾重新命名付款人，舊紀錄可能仍使用舊名稱。請展開下方原始紀錄核對；篩選不會改寫資料。</p>
+          <p>若仍出現其他舊名稱，可展開下方原始紀錄核對；未填或無法辨識的名稱不會自動歸給羊羊或滾滾。</p>
         </details>
 
         {(prepared.invalid.length > 0 || prepared.duplicates.length > 0) && <details className="analysis-warning"><summary>資料核對：{prepared.invalid.length} 筆格式異常、{prepared.duplicates.length} 筆疑似重複</summary>

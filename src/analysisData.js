@@ -20,7 +20,12 @@ export function parseAmount(value) {
 export const UNASSIGNED_PAYER = '__unassigned_payer__';
 
 export function normalizePayer(value) {
-  return typeof value === 'string' ? value.normalize('NFKC').trim().replace(/\s+/gu, ' ') : '';
+  if (typeof value !== 'string') return '';
+  const name = value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+  // These are the two confirmed people; decorative variants share one identity.
+  const plainName = name.replace(/(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}|\p{Emoji_Modifier}|\uFE0E|\uFE0F|\u200D|\u200B|\s)/gu, '');
+  if (plainName === '羊羊' || plainName === '滾滾') return plainName;
+  return name;
 }
 
 export function prepareTransactions(transactions) {
