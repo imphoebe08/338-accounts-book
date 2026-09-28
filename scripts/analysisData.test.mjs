@@ -136,3 +136,32 @@ test('confirmed 羊羊 and 滾滾 identities merge decorations but stay separate
     assert.equal(buildAnnualComparison(rows, { years: [2025], payer, metric: 'income' }).points[0].total, total);
   }
 });
+
+test('salary category includes historical aliases and emoji names across years', async () => {
+  const { buildAnnualComparison } = await import('../src/analysisData.js');
+  const rows = [
+    tx('2022-01-01', 100, 'income', '薪資', '羊羊'),
+    tx('2023-01-01', 200, 'income', '💰 薪水', '羊羊'),
+    tx('2024-01-01', 300, 'income', '薪酬', '羊羊'),
+    tx('2025-01-01', 400, 'income', '年終獎金', '羊羊'),
+    tx('2026-01-01', 500, 'income', '薪水', '羊羊'),
+    tx('2026-02-01', 600, 'income', '獎金', '羊羊'),
+    tx('2026-01-01', 700, 'income', '利息', '羊羊'),
+    tx('2026-01-01', 800, 'income', '薪水', '滾滾')
+  ];
+  const prepared = prepareTransactions(rows, { incomeCats: ['💵 薪水', '利息'] });
+  const result = buildAnnualComparison(prepared.valid, { years: [2022, 2023, 2024, 2025, 2026], metric: 'income', category: '💵 薪水', payer: '羊羊' });
+  assert.deepEqual(result.points.map(point => point.total), [100, 200, 300, 400, 1100]);
+  assert.equal(result.summaries[4].count, 2);
+  assert.equal(prepared.valid[0].originalCategory, '薪資');
+  assert.equal(rows[0].category, '薪資');
+});
+
+test('import matching and chart classification share aliases and preserve unknown categories', async () => {
+  const { resolveCategory } = await import('../src/categoryMatching.js');
+  assert.equal(resolveCategory('發票中獎', 'income', ['🎫 發票']), '🎫 發票');
+  assert.equal(resolveCategory('退款', 'income', ['其他']), '其他');
+  assert.equal(resolveCategory('伙食', 'expense', ['🍚 飲食']), '🍚 飲食');
+  assert.equal(resolveCategory('陌生分類', 'income', ['薪水']), null);
+  assert.equal(prepareTransactions([tx('2025-01-01', 10, 'income', '陌生分類')]).valid[0].category, '陌生分類');
+});

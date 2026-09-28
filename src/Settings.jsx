@@ -1,3 +1,4 @@
+import { EXPENSE_CATEGORY_ALIASES as categoryMapping, INCOME_CATEGORY_ALIASES as incomeCategoryMapping, normalizeCategory, matchCategory } from './categoryMatching';
 // 設定與資料管理頁面
 import { useState, useEffect, useRef } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, EXPENSE_SHORTCUTS, INCOME_SHORTCUTS, PAYERS, STOCKS, BANKS } from './config';
@@ -308,19 +309,6 @@ export default function Settings() {
         return ret;
       };
 
-      // 比對時忽略 Emoji、空白與英文大小寫，儲存時保留設定中的完整名稱。
-      const normalizeCategory = (value) => String(value).normalize('NFKC')
-        .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\s]/gu, '')
-        .toLowerCase();
-      const matchCategory = (value, categories) => {
-        if (categories.includes(value)) return value;
-        const key = normalizeCategory(value);
-        if (!key) return null;
-        const matches = categories.filter(category => normalizeCategory(category) === key);
-        return matches.length === 1 ? matches[0] : null;
-      };
-
-
       // 解析標題與內容
       const headers = parseCsvLine(lines[0]);
       const data = lines.slice(1).map(line => {
@@ -355,32 +343,6 @@ export default function Settings() {
         // 處理第三方記帳軟體：將「主分類」作為實際分類，若「分類」為支出/收入則過濾掉
         let categoryStr = (rowObj['主分類'] || rowObj['子分類'] || rowObj['分類'] || '').trim();
         if (categoryStr === '支出' || categoryStr === '收入') categoryStr = '';
-
-        // 舊分類自動轉換對應表 (包含全轉小寫比對與錯字相容)
-        const categoryMapping = {
-          '伙食': '飲食',
-          '購物': '生活',
-          '日用品': '生活',
-          '數位': '數位訂閱',
-          '變漂漂': '打扮',
-          '治裝費': '打扮',
-          '學貸': '貸款',
-          '露營': '娛樂',
-          '淘寶': '生活',
-          '旅遊': '娛樂',
-          'swift': '交通',
-          'switft': '交通'
-        };
-        
-        const incomeCategoryMapping = {
-          '發票中獎': '發票',
-          '薪資': '薪水',
-          '薪酬': '薪水',
-          '獎金': '薪水',
-          '年終獎金': '薪水',
-          '退款': '其他',
-          '回饋': '其他'
-        };
 
         const sourceCategory = categoryStr;
         const lowerCat = normalizeCategory(categoryStr);

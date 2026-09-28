@@ -1,3 +1,6 @@
+import { resolveCategory } from './categoryMatching.js';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './config.js';
+
 // Date-only ledger values must not shift with the browser's timezone.
 export function parseLedgerDate(value) {
   const match = typeof value === 'string' && value.trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
@@ -28,7 +31,7 @@ export function normalizePayer(value) {
   return name;
 }
 
-export function prepareTransactions(transactions) {
+export function prepareTransactions(transactions, categorySettings = {}) {
   const valid = [], invalid = [], duplicates = [];
   const seen = new Set();
   for (const tx of transactions) {
@@ -39,12 +42,16 @@ export function prepareTransactions(transactions) {
       invalid.push(tx);
       continue;
     }
-    const category = tx.category || '未分類';
+    const categoryList = tx.type === 'income'
+      ? (categorySettings.incomeCats || INCOME_CATEGORIES)
+      : (categorySettings.expenseCats || EXPENSE_CATEGORIES);
+    const originalCategory = tx.category || '未分類';
+    const category = resolveCategory(originalCategory, tx.type, categoryList) || originalCategory;
     const payer = normalizePayer(tx.payer);
     const key = JSON.stringify([parts.year, parts.month, parts.day, tx.type, category, tx.item || '', payer, cents]);
     if (seen.has(key)) duplicates.push(tx);
     seen.add(key);
-    valid.push({ ...tx, ...parts, amount: cents / 100, cents, category, payer });
+    valid.push({ ...tx, ...parts, amount: cents / 100, cents, category, originalCategory, payer });
   }
   return { valid, invalid, duplicates };
 }

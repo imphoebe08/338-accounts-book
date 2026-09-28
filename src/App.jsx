@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from 'firebase/auth'
 import './layout.css'
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore'
+import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { db } from './firebase'
 import TransactionModal from './TransactionModal'
 import AssetModal from './AssetModal'
@@ -111,6 +111,7 @@ function App() {
   const [user, setUser] = useState(undefined);
   const [transactions, setTransactions] = useState([]);
   const [assets, setAssets] = useState([]);
+  const [categorySettings, setCategorySettings] = useState({});
 
   useEffect(() => {
     const auth = getAuth();
@@ -123,8 +124,12 @@ function App() {
     if (!user) {
       setTransactions([]);
       setAssets([]);
+      setCategorySettings({});
       return;
     }
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'user_prefs'), snapshot => {
+      setCategorySettings(snapshot.exists() ? snapshot.data() : {});
+    });
     const qTx = query(collection(db, "transactions"), orderBy("date", "desc"));
     const unsubTx = onSnapshot(qTx, (snapshot) => {
       setTransactions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -133,6 +138,7 @@ function App() {
       setAssets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     return () => {
+      unsubSettings();
       unsubTx();
       unsubAssets();
     };
@@ -174,8 +180,8 @@ function App() {
     <BrowserRouter>
       <Layout user={user}>
         <Routes>
-          <Route path="/" element={<Overview transactions={transactions} />} />
-          <Route path="/analysis" element={<Analysis transactions={transactions} assets={assets} />} />
+          <Route path="/" element={<Overview categorySettings={categorySettings} transactions={transactions} />} />
+          <Route path="/analysis" element={<Analysis categorySettings={categorySettings} transactions={transactions} assets={assets} />} />
           <Route path="/assets" element={<Assets assets={assets} />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

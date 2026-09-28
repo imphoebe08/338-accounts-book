@@ -8,7 +8,7 @@ const money = value => value == null ? '—' : `$${value.toLocaleString('zh-TW',
 const percent = value => value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 const labels = { expense: '支出', income: '收入', balance: '結餘' };
 
-export default function Analysis({ transactions = [], assets = [] }) {
+export default function Analysis({ transactions = [], assets = [], categorySettings }) {
   const [tab, setTab] = useState('transactions');
   const [metric, setMetric] = useState('expense');
   const [category, setCategory] = useState('');
@@ -16,7 +16,7 @@ export default function Analysis({ transactions = [], assets = [] }) {
   const [month, setMonth] = useState(0);
   const [chosenYears, setChosenYears] = useState(null);
   const [chartView, setChartView] = useState('growth');
-  const prepared = useMemo(() => prepareTransactions(transactions), [transactions]);
+  const prepared = useMemo(() => prepareTransactions(transactions, categorySettings), [transactions, categorySettings]);
   const availableYears = useMemo(() => [...new Set([new Date().getFullYear(), ...prepared.valid.map(tx => tx.year)])].sort((a, b) => b - a), [prepared]);
   // Default to the newest recorded years, even when the imported file contains only history.
   const recordedYears = [...new Set(prepared.valid.map(tx => tx.year))].sort((a, b) => b - a);
@@ -101,7 +101,7 @@ export default function Analysis({ transactions = [], assets = [] }) {
         </section>
         <details className="card analysis-details"><summary>展開圖表數值與原始紀錄</summary>
           <div className="analysis-table-scroll"><table className="analysis-table"><caption>年度{labels[metric]}總和與增長率</caption><thead><tr><th>年度</th><th>總和</th><th>前一年同條件總和</th><th>年增率</th></tr></thead><tbody>{comparison.points.map(point => <tr key={point.year}><th>{point.name}</th><td>{money(point.total)}</td><td>{money(point.previousTotal)}</td><td>{percent(point.growth)}</td></tr>)}</tbody></table></div>
-          {comparison.summaries.map(summary => <details key={summary.year}><summary>{summary.year} 年 · {summary.count} 筆紀錄</summary><div className="analysis-table-scroll"><table className="analysis-table"><thead><tr><th>日期</th><th>類型</th><th>分類／內容</th><th>付款人</th><th>金額</th></tr></thead><tbody>{summary.rows.map((tx, i) => <tr key={tx.id || i}><td>{tx.date}</td><td>{labels[tx.type]}</td><td>{tx.category}<br />{tx.item}</td><td>{tx.payer || '—'}</td><td>{money(tx.amount)}</td></tr>)}</tbody></table></div></details>)}
+          {comparison.summaries.map(summary => <details key={summary.year}><summary>{summary.year} 年 · {summary.count} 筆紀錄</summary><div className="analysis-table-scroll"><table className="analysis-table"><thead><tr><th>日期</th><th>類型</th><th>分類／內容</th><th>付款人</th><th>金額</th></tr></thead><tbody>{summary.rows.map((tx, i) => <tr key={tx.id || i}><td>{tx.date}</td><td>{labels[tx.type]}</td><td>{tx.category}{tx.originalCategory !== tx.category && <small>（原分類：{tx.originalCategory}）</small>}<br />{tx.item}</td><td>{tx.payer || '—'}</td><td>{money(tx.amount)}</td></tr>)}</tbody></table></div></details>)}
         </details>
       </>}
     </div>

@@ -33,8 +33,8 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
   );
 };
 
-export default function Overview({ transactions: rawTransactions }) {
-  const transactions = useMemo(() => prepareTransactions(rawTransactions).valid, [rawTransactions]);
+export default function Overview({ transactions: rawTransactions, categorySettings }) {
+  const transactions = useMemo(() => prepareTransactions(rawTransactions, categorySettings).valid, [rawTransactions, categorySettings]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [editingTx, setEditingTx] = useState(null);
